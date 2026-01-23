@@ -1,219 +1,309 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
+import itertools
 
-st.set_page_config(page_title="Naming Convention Creator", layout="wide")
-st.title("Naming Convention Creator")
+st.set_page_config(page_title="Bulk Naming Convention Generator", layout="wide")
 
+# ------------------------
+# Helpers
+# ------------------------
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
-def format_date_any(x) -> str:
-    """
-    Accepts: datetime/date, 'YYYY-MM-DD', 'Jun.27.2025', 'Jun 27 2025', etc.
-    Returns: Mon.DD.YYYY
-    """
-    if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and not x.strip()):
-        return ""
-
-    if isinstance(x, (datetime, date)):
-        d = x
-        return f"{MONTHS[d.month-1]}.{d.day:02d}.{d.year}"
-
-    s = str(x).strip()
-
-    # Already in Mon.DD.YYYY?
-    try:
-        parts = s.split(".")
-        if len(parts) == 3 and parts[0] in MONTHS:
-            dd = int(parts[1])
-            yyyy = int(parts[2])
-            return f"{parts[0]}.{dd:02d}.{yyyy}"
-    except Exception:
-        pass
-
-    # Try common parse
-    for fmt in ("%Y-%m-%d", "%b %d %Y", "%B %d %Y", "%m/%d/%Y", "%d/%m/%Y"):
-        try:
-            d = datetime.strptime(s, fmt).date()
-            return f"{MONTHS[d.month-1]}.{d.day:02d}.{d.year}"
-        except Exception:
-            continue
-
-    # Last resort: pandas parser
-    try:
-        d = pd.to_datetime(s, errors="coerce").date()
-        if d:
-            return f"{MONTHS[d.month-1]}.{d.day:02d}.{d.year}"
-    except Exception:
-        pass
-
-    return ""  # invalid/unparsable
+def fmt_date(d: date) -> str:
+    return f"{MONTHS[d.month-1]}.{d.day:02d}.{d.year}"
 
 def sanitize_freeform(s: str) -> str:
+    # underscores are reserved as delimiters; replace with spaces
     return (s or "").replace("_", " ").strip()
 
-def build_name_row(row: dict):
-    year = str(row.get("Year","")).strip()
-    client = str(row.get("ClientCode","")).strip()
-    product = str(row.get("ProductCode","")).strip()
-    lang = str(row.get("Language","")).strip()
-
-    campaign_raw = str(row.get("CampaignName","") or "")
-    messaging_raw = str(row.get("Messaging","") or "")
-    size = str(row.get("Size","")).strip()
-    date_raw = row.get("StartDate","")
-    additional_raw = str(row.get("AdditionalInfo","") or "")
+def build_name(
+    year: int,
+    client_code: str,
+    product_code: str,
+    language: str,
+    funnel: str,
+    region: str,
+    messaging: str,
+    size: str,
+    start_date: date,
+    duration: str,
+    delivery_tag: str = "",
+    additional_info: str = "",
+    delimiter: str = "_",
+) -> tuple[str, str]:
+    """Returns (name, warnings). Naming order can be edited here."""
 
     warnings = []
 
-    # underscore validation
-    underscore_fields = []
-    if "_" in campaign_raw: underscore_fields.append("CampaignName")
-    if "_" in messaging_raw: underscore_fields.append("Messaging")
-    if "_" in additional_raw: underscore_fields.append("AdditionalInfo")
-    if underscore_fields:
-        warnings.append(f"Underscore(s) found in: {', '.join(underscore_fields)} (replaced with spaces).")
+    # Free-form fields
+    messaging_raw = messaging
+    additional_raw = additional_info
 
-    campaign = sanitize_freeform(campaign_raw)
-    messaging = sanitize_freeform(messaging_raw)
-    additional = sanitize_freeform(additional_raw)
-    date_fmt = format_date_any(date_raw)
+    if "_" in (messaging_raw or ""):
+        warnings.append("Messaging contained '_' (replaced with spaces)")
+    if "_" in (additional_raw or ""):
+        warnings.append("Additional info contained '_' (replaced with spaces)")
 
-    # missing required fields
-    required = {
-        "Year": year,
-        "ClientCode": client,
-        "ProductCode": product,
-        "Language": lang,
-        "CampaignName": campaign,
-        "Messaging": messaging,
-        "Size": size,
-        "StartDate": date_fmt,
-    }
-    missing = [k for k,v in required.items() if not v]
-    if missing:
-        warnings.append("Missing: " + ", ".join(missing))
+    messaging_clean = sanitize_freeform(messaging_raw)
+    additional_clean = sanitize_freeform(additional_raw)
 
-    parts = [year, client, product, lang, campaign, messaging, size, date_fmt]
-    if additional:
-        parts.append(additional)
+    date_part = fmt_date(start_date)
+
+    # Example order (adjust if your official order differs):
+    # Year_Client_Product_Lang_Funnel_Region_Messaging_Size_Date_Duration_[DeliveryTag]_[Additional]
+    parts = [
+        str(year).strip(),
+        client_code.strip(),
+        product_code.strip(),
+        language.strip(),
+        funnel.strip(),
+        region.strip(),
+        messaging_clean,
+        size.strip(),
+        date_part,
+        str(duration).strip(),
+    ]
+
+    if delivery_tag:
+        parts.append(str(delivery_tag).strip())
+
+    if additional_clean:
+        parts.append(additional_clean)
 
     parts = [p for p in parts if p]
-    output = "_".join(parts)
+    name = delimiter.join(parts)
 
-    return output, " | ".join(warnings)
+    # Basic missing checks
+    required_missing = []
+    if not year: required_missing.append("Year")
+    if not client_code: required_missing.append("ClientCode")
+    if not product_code: required_missing.append("ProductCode")
+    if not language: required_missing.append("Language")
+    if not funnel: required_missing.append("Funnel")
+    if not region: required_missing.append("Region")
+    if not messaging_clean: required_missing.append("Messaging")
+    if not size: required_missing.append("Size")
+    if not start_date: required_missing.append("StartDate")
+    if not duration: required_missing.append("Duration")
 
-# --- Tabs ---
-tab1, tab2 = st.tabs(["Single Builder", "Bulk Builder"])
+    if required_missing:
+        warnings.append("Missing: " + ", ".join(required_missing))
 
-with tab1:
-    st.subheader("Single Builder (quick one-off)")
-    c1, c2, c3 = st.columns(3)
+    return name, " | ".join(warnings)
 
-    with c1:
-        year = st.number_input("Year", min_value=2000, max_value=2100, value=2025, step=1)
-        client = st.text_input("ClientCode (LOB)", value="RHE")
-        lang = st.selectbox("Language", ["EN","FR"], index=1)
 
-    with c2:
-        product = st.text_input("ProductCode", value="IGN")
-        size = st.text_input("Size", value="9x16")
-        start_date = st.date_input("StartDate", value=date.today())
+def cartesian_generate(config: dict) -> pd.DataFrame:
+    """Generate one row per creative (flat format)."""
 
-    with c3:
-        campaign = st.text_input("CampaignName (no underscore)", value="Q3 Comwave QC")
-        messaging = st.text_input("Messaging (no underscore)", value="Internet Offer V1")
-        additional = st.text_input("AdditionalInfo (no underscore)", value="10s.zip")
-
-    out, warn = build_name_row({
-        "Year": year,
-        "ClientCode": client,
-        "ProductCode": product,
-        "Language": lang,
-        "CampaignName": campaign,
-        "Messaging": messaging,
-        "Size": size,
-        "StartDate": start_date,
-        "AdditionalInfo": additional,
-    })
-
-    st.markdown("### Output")
-    st.code(out, language=None)
-    if warn:
-        st.warning(warn)
-    else:
-        st.success("Looks good.")
-
-with tab2:
-    st.subheader("Bulk Builder (paste rows or upload CSV)")
-
-    st.markdown(
-        """
-**Input columns required (header row):**  
-`Year,ClientCode,ProductCode,Language,CampaignName,Messaging,Size,StartDate,AdditionalInfo`
-
-- `StartDate` can be `YYYY-MM-DD` or `Jun.27.2025`
-- Free-form fields must not contain `_` (we auto-fix but warn)
-        """
+    combos = itertools.product(
+        config["funnels"],
+        config["messages"],
+        config["regions"],
+        config["languages"],
+        config["durations"],
+        config["sizes"],
     )
 
-    sample = """Year,ClientCode,ProductCode,Language,CampaignName,Messaging,Size,StartDate,AdditionalInfo
-2025,RHE,IGN,FR,Q3 Comwave QC,Internet Offer V1,9x16,2025-06-27,10s.zip
-2025,RCS,WLS,EN,Q1 Always On,Bring your own phone,1x1,2025-01-10,Static
-"""
+    rows = []
+    for funnel, msg, region, lang, dur, size in combos:
+        name, warn = build_name(
+            year=config["year"],
+            client_code=config["client_code"],
+            product_code=config["product_code"],
+            language=lang,
+            funnel=funnel,
+            region=region,
+            messaging=msg,
+            size=size,
+            start_date=config["start_date"],
+            duration=dur,
+            delivery_tag=config.get("delivery_tag", ""),
+            additional_info=config.get("additional_info", ""),
+            delimiter=config.get("delimiter", "_"),
+        )
+        rows.append({
+            "Funnel": funnel,
+            "Messaging": sanitize_freeform(msg),
+            "Region": region,
+            "Language": lang,
+            "Duration": dur,
+            "Size": size,
+            "Creative Name": name,
+            "Warnings": warn,
+            "Delivery Tag": config.get("delivery_tag", ""),
+            "Start Date": fmt_date(config["start_date"]),
+        })
 
-    colA, colB = st.columns([1,1])
+    return pd.DataFrame(rows)
 
-    with colA:
-        uploaded = st.file_uploader("Upload CSV", type=["csv"])
-        st.caption("If you upload a CSV, we’ll use it. Otherwise paste below.")
 
-    with colB:
-        pasted = st.text_area("Or paste CSV text here", value=sample, height=170)
+def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
+    """Pivot to match your screenshot style: size columns with name inside cells."""
+    idx = ["Funnel", "Messaging", "Region", "Language", "Duration"]
+    pivot = df_flat.pivot_table(
+        index=idx,
+        columns="Size",
+        values="Creative Name",
+        aggfunc="first",
+    ).reset_index()
 
-    df = None
-    if uploaded is not None:
-        df = pd.read_csv(uploaded)
-    else:
-        try:
-            df = pd.read_csv(pd.io.common.StringIO(pasted))
-        except Exception as e:
-            st.error("Could not parse pasted CSV. Make sure it includes a header row and commas.")
+    # Optional: put sizes in a consistent order if present
+    size_cols = [c for c in pivot.columns if c not in idx]
+    # Keep as-is; you can sort sizes here if you want.
+
+    return pivot
+
+
+# ------------------------
+# UI
+# ------------------------
+st.title("Bulk Naming Convention Generator")
+st.caption("Generate a full naming matrix in a few clicks (multi-select + paste list + Generate).")
+
+left, right = st.columns([1, 1.35], gap="large")
+
+# --- Shared fields (set once)
+with left:
+    st.subheader("Shared fields (set once)")
+
+    year = st.number_input("Year", min_value=2000, max_value=2100, value=2026, step=1)
+
+    client_code = st.text_input("Client Code (LOB)", value="RNS")
+    product_code = st.text_input("Product Code", value="BRA")
+
+    start_date = st.date_input("Start date", value=date.today())
+
+    delivery_tag = st.text_input("Delivery tag (optional)", value="")  # e.g., Rel / Pros
+    additional_info = st.text_input("Additional info (optional)", value="")
+
+    delimiter = st.text_input("Delimiter", value="_")
+
+    st.divider()
+
+    st.subheader("Variants")
+
+    funnels = st.multiselect("Funnel", options=["AWR", "COS", "COV"], default=["AWR", "COS", "COV"])
+    regions = st.multiselect("Region", options=["ROC", "QC", "ATL"], default=["ROC"])
+    languages = st.multiselect("Language", options=["EN", "FR"], default=["EN", "FR"])
+    durations = st.multiselect("Duration", options=["6s", "10s", "15s", "30s"], default=["15s"])
+
+    sizes = st.multiselect(
+        "Sizes",
+        options=["1x1", "4x3", "9x16", "16x9", "300x250", "300x600", "728x90"],
+        default=["1x1", "4x3", "9x16", "16x9"],
+    )
+
+    st.markdown("**Messaging (paste one per line):**")
+    messages_text = st.text_area(
+        "",
+        height=160,
+        value="Lower Costs\nTransparent Pricing\nPricing\nLatest Equipment\nManagement\nSupport\nSavings",
+        placeholder="Paste messages here, one per line",
+        label_visibility="collapsed",
+    )
+
+    # Presets
+    st.divider()
+    st.subheader("Presets")
+
+    p1, p2, p3 = st.columns(3)
+    if p1.button("Standard Social Pack", use_container_width=True):
+        sizes = ["1x1", "4x3", "9x16"]
+        durations = ["6s", "15s"]
+        regions = ["ROC", "QC"]
+        languages = ["EN", "FR"]
+    if p2.button("Video Pack", use_container_width=True):
+        sizes = ["16x9", "9x16"]
+        durations = ["6s", "15s", "30s"]
+    if p3.button("Display Pack", use_container_width=True):
+        sizes = ["300x250", "300x600", "728x90"]
+        durations = ["10s"]
+
+# Turn pasted lines into list
+messages = [line.strip() for line in messages_text.splitlines() if line.strip()]
+
+# Validate config
+config = {
+    "year": year,
+    "client_code": client_code,
+    "product_code": product_code,
+    "start_date": start_date,
+    "delivery_tag": delivery_tag.strip(),
+    "additional_info": additional_info.strip(),
+    "delimiter": delimiter,
+    "funnels": funnels,
+    "regions": regions,
+    "languages": languages,
+    "durations": durations,
+    "sizes": sizes,
+    "messages": messages,
+}
+
+with right:
+    st.subheader("Generate")
+
+    # quick stats
+    total = len(funnels) * len(regions) * len(languages) * len(durations) * len(sizes) * len(messages)
+    st.info(f"This will generate **{total:,}** creative names.")
+
+    mode = st.radio(
+        "Output format",
+        options=["Sheet mode (pivot by Size)", "Trafficking mode (one row per creative)"],
+        index=0,
+        horizontal=True,
+    )
+
+    generate = st.button("Generate naming conventions", type="primary", use_container_width=True)
+
+    if generate:
+        if total == 0:
+            st.error("Nothing to generate — select at least one option in each variant.")
             st.stop()
 
-    # Ensure required columns exist
-    required_cols = ["Year","ClientCode","ProductCode","Language","CampaignName","Messaging","Size","StartDate","AdditionalInfo"]
-    missing_cols = [c for c in required_cols if c not in df.columns]
-    if missing_cols:
-        st.error(f"Missing columns: {', '.join(missing_cols)}")
-        st.stop()
+        df_flat = cartesian_generate(config)
 
-    st.markdown("### Preview (edit before generating if you want)")
-    edited = st.data_editor(df, use_container_width=True, num_rows="dynamic")
+        # Duplicate detection (same name appearing multiple times)
+        dupes = df_flat[df_flat.duplicated(subset=["Creative Name"], keep=False)].copy()
 
-    if st.button("Generate naming conventions", type="primary", use_container_width=True):
-        out_rows = []
-        for _, r in edited.iterrows():
-            out, warn = build_name_row(r.to_dict())
-            out_rows.append({"NamingConvention": out, "Warnings": warn})
+        if mode.startswith("Sheet"):
+            df_out = pivot_like_sheet(df_flat)
+            st.markdown("### Output (sheet-style)")
+            st.dataframe(df_out, use_container_width=True)
+            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download CSV (sheet mode)",
+                data=csv_bytes,
+                file_name="naming_matrix_sheet_mode.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        else:
+            df_out = df_flat
+            st.markdown("### Output (trafficking-style)")
+            st.dataframe(df_out, use_container_width=True)
+            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download CSV (trafficking mode)",
+                data=csv_bytes,
+                file_name="naming_matrix_trafficking_mode.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
 
-        out_df = edited.copy()
-        out_df["NamingConvention"] = [x["NamingConvention"] for x in out_rows]
-        out_df["Warnings"] = [x["Warnings"] for x in out_rows]
+        # Warnings + duplicate names
+        warn_count = (df_flat["Warnings"].astype(str).str.len() > 0).sum()
+        if warn_count:
+            st.warning(f"Warnings found in {warn_count} row(s). Check the 'Warnings' column in trafficking mode.")
 
-        st.markdown("### Results")
-        st.dataframe(out_df, use_container_width=True)
+        if not dupes.empty:
+            st.error(f"Duplicate creative names detected: {len(dupes)} rows share identical 'Creative Name'.")
+            st.dataframe(dupes[["Funnel","Messaging","Region","Language","Duration","Size","Creative Name"]], use_container_width=True)
 
-        # Downloads
-        csv_bytes = out_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Download output CSV",
-            data=csv_bytes,
-            file_name="naming_conventions_output.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-
-        # Optional: quick copy block for just the names
+        # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("\n".join(out_df["NamingConvention"].astype(str).tolist()), language=None)
+        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+
+st.caption(
+    "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
+)
