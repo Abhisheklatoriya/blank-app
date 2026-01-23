@@ -4,7 +4,7 @@ from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
 
-fst.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")age_icon="🦡", layout="wide")
+st.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")
 
 # ------------------------
 # Helpers
@@ -91,18 +91,12 @@ def build_name(
     if required_missing:
         warnings.append("Missing: " + ", ".join(required_missing))
 
-    return def is_valid_url(u: str) -> bool:
+    return name, " | ".join(warnings)
+
+
+def is_valid_url(u: str) -> bool:
     if not u or not str(u).strip():
         return True  # allow blank
-    try:
-        p = urlparse(str(u).strip())
-        return p.scheme in ("http", "https") and bool(p.netloc)
-    except Exception:
-        return False
-
-
-def cartesian_generate(config: dict) -> pd.DataFrame:
-    """Generate one row per creative (flat format)."""eturn True  # allow blank
     try:
         p = urlparse(str(u).strip())
         return p.scheme in ("http", "https") and bool(p.netloc)
@@ -160,7 +154,9 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
     """Pivot to match your screenshot style: size columns with name inside cells."""
-    idx = ["Funnel", st.caption("Fast asset-matrix + bulk naming generator for AEs — few clicks, many outputs.") index=idx,
+    idx = ["Funnel", "Messaging", "Region", "Language", "Duration"]
+    pivot = df_flat.pivot_table(
+        index=idx,
         columns="Size",
         values="Creative Name",
         aggfunc="first",
@@ -230,7 +226,9 @@ with left:
     product_code = st.text_input("Product Code", key="product_code")
 
     start_date = st.date_input("Start date", value=date.today())
-    end_date = st.date_input("End date", value= st.text_input("URL (optional)", value="", placeholder="https://...")
+    end_date = st.date_input("End date", value=date.today())
+
+    url = st.text_input("URL (optional)", value="", placeholder="https://...")
     if url and not is_valid_url(url):
         st.warning("URL looks invalid. Please use a full http(s) URL, e.g. https://example.com")
 
@@ -272,7 +270,11 @@ with left:
         if not preset:
             return
         st.session_state.sizes = preset["sizes"].copy()
-        st.session_state.dTRIX_PRESETS.keys()),
+        st.session_state.durations = preset["durations"].copy()
+
+    st.selectbox(
+        "What kind of asset matrix?",
+        options=list(ASSET_MATRIX_PRESETS.keys()),
         key="asset_type",
         on_change=apply_asset_preset,
     )
