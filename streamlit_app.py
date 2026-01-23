@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import date, datetime
 import itertools
 
-st.set_page_config(page_title="Bulk Naming Convention Generator", layout="wide")
+st.set_page_config(page_title="Badger – Naming Convention Generator", page_icon="🦡", layout="wide")
 
 # ------------------------
 # Helpers
@@ -158,7 +158,8 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
 # ------------------------
 # UI
 # ------------------------
-st.title("Bulk Naming Convention Generator")
+st.title("🦡 Badger")
+st.caption("Fast bulk naming convention generator for AEs — few clicks, many outputs.")
 st.caption("Generate a full naming matrix in a few clicks (multi-select + paste list + Generate).")
 
 left, right = st.columns([1, 1.35], gap="large")
