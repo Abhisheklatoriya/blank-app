@@ -167,10 +167,48 @@ left, right = st.columns([1, 1.35], gap="large")
 with left:
     st.subheader("Shared fields (set once)")
 
+    # LOB presets (edit these to match your internal taxonomy)
+    LOB_PRESETS = {
+        "Business": {"client_code": "RNS", "product_code": "BRA"},
+        "Wireless": {"client_code": "RCS", "product_code": "WLS"},
+        "Connected Home": {"client_code": "RHE", "product_code": "IGN"},
+        "Rogers Bank": {"client_code": "RBG", "product_code": "RBK"},
+        "Corporate Brand": {"client_code": "RCP", "product_code": "RCB"},
+        "Shaw Direct": {"client_code": "RSH", "product_code": "CBL"},
+        "Custom": {"client_code": "", "product_code": ""},
+    }
+
+    # Session-state defaults (so presets can update inputs)
+    if "client_code" not in st.session_state:
+        st.session_state.client_code = "RNS"
+    if "product_code" not in st.session_state:
+        st.session_state.product_code = "BRA"
+    if "lob" not in st.session_state:
+        st.session_state.lob = "Business"
+
+    def apply_lob_preset():
+        preset = LOB_PRESETS.get(st.session_state.lob, None)
+        if not preset:
+            return
+        # Only overwrite when preset has values (Custom keeps user's typed values)
+        if preset.get("client_code") is not None:
+            if preset["client_code"] != "":
+                st.session_state.client_code = preset["client_code"]
+        if preset.get("product_code") is not None:
+            if preset["product_code"] != "":
+                st.session_state.product_code = preset["product_code"]
+
     year = st.number_input("Year", min_value=2000, max_value=2100, value=2026, step=1)
 
-    client_code = st.text_input("Client Code (LOB)", value="RNS")
-    product_code = st.text_input("Product Code", value="BRA")
+    st.selectbox(
+        "LOB (prefills codes)",
+        options=list(LOB_PRESETS.keys()),
+        key="lob",
+        on_change=apply_lob_preset,
+    )
+
+    client_code = st.text_input("Client Code", key="client_code")
+    product_code = st.text_input("Product Code", key="product_code")
 
     start_date = st.date_input("Start date", value=date.today())
 
