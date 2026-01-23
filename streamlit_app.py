@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 import itertools
+from urllib.parse import urlparse
 
-st.set_page_config(page_title="Badger – Naming Convention Generator", page_icon="🦡", layout="wide")
+fst.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")age_icon="🦡", layout="wide")
 
 # ------------------------
 # Helpers
@@ -90,7 +91,23 @@ def build_name(
     if required_missing:
         warnings.append("Missing: " + ", ".join(required_missing))
 
-    return name, " | ".join(warnings)
+    return def is_valid_url(u: str) -> bool:
+    if not u or not str(u).strip():
+        return True  # allow blank
+    try:
+        p = urlparse(str(u).strip())
+        return p.scheme in ("http", "https") and bool(p.netloc)
+    except Exception:
+        return False
+
+
+def cartesian_generate(config: dict) -> pd.DataFrame:
+    """Generate one row per creative (flat format)."""eturn True  # allow blank
+    try:
+        p = urlparse(str(u).strip())
+        return p.scheme in ("http", "https") and bool(p.netloc)
+    except Exception:
+        return False
 
 
 def cartesian_generate(config: dict) -> pd.DataFrame:
@@ -132,7 +149,10 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
             "Creative Name": name,
             "Warnings": warn,
             "Delivery Tag": config.get("delivery_tag", ""),
+            "Asset Type": config.get("asset_type", ""),
             "Start Date": fmt_date(config["start_date"]),
+            "End Date": fmt_date(config["end_date"]) if config.get("end_date") else "",
+            "URL": config.get("url", ""),
         })
 
     return pd.DataFrame(rows)
@@ -140,9 +160,7 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
     """Pivot to match your screenshot style: size columns with name inside cells."""
-    idx = ["Funnel", "Messaging", "Region", "Language", "Duration"]
-    pivot = df_flat.pivot_table(
-        index=idx,
+    idx = ["Funnel", st.caption("Fast asset-matrix + bulk naming generator for AEs — few clicks, many outputs.") index=idx,
         columns="Size",
         values="Creative Name",
         aggfunc="first",
@@ -212,6 +230,9 @@ with left:
     product_code = st.text_input("Product Code", key="product_code")
 
     start_date = st.date_input("Start date", value=date.today())
+    end_date = st.date_input("End date", value= st.text_input("URL (optional)", value="", placeholder="https://...")
+    if url and not is_valid_url(url):
+        st.warning("URL looks invalid. Please use a full http(s) URL, e.g. https://example.com")
 
     delivery_tag = st.text_input("Delivery tag (optional)", value="")  # e.g., Rel / Pros
     additional_info = st.text_input("Additional info (optional)", value="")
@@ -220,17 +241,60 @@ with left:
 
     st.divider()
 
+    st.subheader("Asset matrix type")
+
+    # Asset matrix presets (edit these once, and AEs will be fast)
+    ASSET_MATRIX_PRESETS = {
+        "Social": {
+            "sizes": ["1x1", "4x3", "9x16", "16x9"],
+            "durations": ["6s", "15s"],
+        },
+        "Display": {
+            "sizes": ["300x250", "300x600", "728x90", "160x600", "970x250"],
+            "durations": ["10s"],
+        },
+        "Video": {
+            "sizes": ["16x9", "9x16"],
+            "durations": ["6s", "15s", "30s"],
+        },
+    }
+
+    if "asset_type" not in st.session_state:
+        st.session_state.asset_type = "Social"
+
+    if "sizes" not in st.session_state:
+        st.session_state.sizes = ASSET_MATRIX_PRESETS[st.session_state.asset_type]["sizes"].copy()
+    if "durations" not in st.session_state:
+        st.session_state.durations = ASSET_MATRIX_PRESETS[st.session_state.asset_type]["durations"].copy()
+
+    def apply_asset_preset():
+        preset = ASSET_MATRIX_PRESETS.get(st.session_state.asset_type)
+        if not preset:
+            return
+        st.session_state.sizes = preset["sizes"].copy()
+        st.session_state.dTRIX_PRESETS.keys()),
+        key="asset_type",
+        on_change=apply_asset_preset,
+    )
+
+    st.divider()
     st.subheader("Variants")
 
     funnels = st.multiselect("Funnel", options=["AWR", "COS", "COV"], default=["AWR", "COS", "COV"])
     regions = st.multiselect("Region", options=["ROC", "QC", "ATL"], default=["ROC"])
     languages = st.multiselect("Language", options=["EN", "FR"], default=["EN", "FR"])
-    durations = st.multiselect("Duration", options=["6s", "10s", "15s", "30s"], default=["15s"])
+    durations = st.multiselect(
+        "Duration",
+        options=["6s", "10s", "15s", "30s"],
+        key="durations",
+        default=st.session_state.durations,
+    )
 
     sizes = st.multiselect(
         "Sizes",
-        options=["1x1", "4x3", "9x16", "16x9", "300x250", "300x600", "728x90"],
-        default=["1x1", "4x3", "9x16", "16x9"],
+        options=["1x1", "4x3", "9x16", "16x9", "300x250", "300x600", "728x90", "160x600", "970x250"],
+        key="sizes",
+        default=st.session_state.sizes,
     )
 
     st.markdown("**Messaging (paste one per line):**")
@@ -268,6 +332,8 @@ config = {
     "client_code": client_code,
     "product_code": product_code,
     "start_date": start_date,
+    "end_date": end_date,
+    "url": url.strip(),
     "delivery_tag": delivery_tag.strip(),
     "additional_info": additional_info.strip(),
     "delimiter": delimiter,
@@ -298,6 +364,10 @@ with right:
     if generate:
         if total == 0:
             st.error("Nothing to generate — select at least one option in each variant.")
+            st.stop()
+
+        if config.get("url") and not is_valid_url(config.get("url")):
+            st.error("URL is invalid. Please use a full http(s) URL, e.g. https://example.com")
             st.stop()
 
         df_flat = cartesian_generate(config)
