@@ -4,6 +4,7 @@ from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
 import json
+import uuid
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")
@@ -425,42 +426,6 @@ with right:
             st.markdown("### Output (sheet-style)")
             st.dataframe(df_out, use_container_width=True)
 
-            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
-            col_a, col_b = st.columns([1, 1], gap="small")
-            with col_a:
-                st.download_button(
-                    "Download CSV (sheet mode)",
-                    data=csv_bytes,
-                    file_name="naming_matrix_sheet_mode.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
-            with col_b:
-                # Copy-to-clipboard (TSV for Sheets/Docs)
-                tsv = df_out.to_csv(index=False, sep="	")
-                copy_payload = json.dumps(tsv)
-                components.html(
-                    f"""
-                    <div style='display:flex; justify-content:flex-end;'>
-                      <button id='copyBtn' style='width:100%; padding:0.6rem 0.8rem; border-radius:0.5rem; border:1px solid rgba(49,51,63,0.2); background:white; cursor:pointer;'>Copy sheet</button>
-                    </div>
-                    <script>
-                      const tsv = {copy_payload};
-                      const btn = document.getElementById('copyBtn');
-                      btn.addEventListener('click', async () => {{
-                        try {{
-                          await navigator.clipboard.writeText(tsv);
-                          btn.innerText = 'Copied!';
-                          setTimeout(() => btn.innerText = 'Copy sheet', 1200);
-                        }} catch (e) {{
-                          btn.innerText = 'Copy failed';
-                          console.error(e);
-                        }}
-                      }});
-                    </script>
-                    """,
-                    height=55,
-                )
 
         # Warnings + duplicate names
         warn_count = (df_flat["Warnings"].astype(str).str.len() > 0).sum()
