@@ -3,6 +3,51 @@ import pandas as pd
 from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
+import streamlit.components.v1 as components
+
+# ------------------------
+# Aesthetic Feature: Eye-Tracking Badger
+# ------------------------
+def add_tracking_badger():
+    badger_html = """
+    <div id="badger-container" style="display: flex; justify-content: center; align-items: center; padding: 10px; background: #f0f2f6; border-radius: 15px;">
+        <svg width="180" height="140" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="50" r="15" fill="#222" />
+            <circle cx="140" cy="50" r="15" fill="#222" />
+            <path d="M40 80 Q100 20 160 80 Q160 140 100 150 Q40 140 40 80" fill="#222" />
+            <path d="M65 80 Q100 45 135 80 Q135 110 100 125 Q65 110 65 80" fill="white" />
+            <circle cx="85" cy="85" r="10" fill="white" stroke="#333" stroke-width="1"/>
+            <circle cx="115" cy="85" r="10" fill="white" stroke="#333" stroke-width="1"/>
+            <circle id="left-pupil" cx="85" cy="85" r="4" fill="black" />
+            <circle id="right-pupil" cx="115" cy="85" r="4" fill="black" />
+            <ellipse cx="100" cy="108" rx="8" ry="5" fill="#111" />
+        </svg>
+    </div>
+    <script>
+        const leftPupil = document.getElementById('left-pupil');
+        const rightPupil = document.getElementById('right-pupil');
+        const leftEyePos = { x: 85, y: 85 };
+        const rightEyePos = { x: 115, y: 85 };
+        document.addEventListener('mousemove', (e) => {
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            function movePupil(pupil, origin) {
+                const rect = pupil.getBoundingClientRect();
+                const eyeX = rect.left + rect.width / 2;
+                const eyeY = rect.top + rect.height / 2;
+                const angle = Math.atan2(mouseY - eyeY, mouseX - eyeX);
+                const distance = 3.5; 
+                const newX = origin.x + Math.cos(angle) * distance;
+                const newY = origin.y + Math.sin(angle) * distance;
+                pupil.setAttribute('cx', newX);
+                pupil.setAttribute('cy', newY);
+            }
+            movePupil(leftPupil, leftEyePos);
+            movePupil(rightPupil, rightEyePos);
+        });
+    </script>
+    """
+    components.html(badger_html, height=160)
 
 # ------------------------
 # Helpers
@@ -49,9 +94,10 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
         config["sizes"]
     )
     rows = []
+    current_year = date.today().year # Automatically detect year
     for funnel, msg, region, lang, dur, size in combos:
         name, _ = build_name(
-            config["year"], config["client_code"], config["product_code"], 
+            current_year, config["client_code"], config["product_code"], 
             lang, funnel, region, msg, size, config["start_date"], dur, 
             config.get("delivery_tag", ""), config.get("additional_info", ""), config.get("delimiter", "_")
         )
@@ -65,12 +111,11 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
             "Creative Name": name,
             "Start Date": fmt_date(config["start_date"]), 
             "End Date": fmt_date(config["end_date"]), 
-            "URL": "" # Empty for user to paste into
+            "URL": "" 
         })
     return pd.DataFrame(rows)
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    # URL is excluded from index to ensure it is added as the last column after pivoting
     idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "Start Date", "End Date"]
     pivot = df_flat.pivot_table(
         index=idx, 
@@ -78,8 +123,6 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
         values="Creative Name", 
         aggfunc="first"
     ).reset_index()
-    
-    # Force URL to the far right
     pivot["URL"] = ""
     return pivot
 
@@ -87,20 +130,27 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
 # UI Setup
 # ------------------------
 st.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")
+
+with st.sidebar:
+    st.markdown("### Badger Guardian")
+    add_tracking_badger()
+    st.divider()
+    st.markdown("### Settings")
+    delimiter = st.text_input("Delimiter", value="_")
+
 st.title("🦡 Badger")
 
 left, right = st.columns([1, 1.35], gap="large")
 
 with left:
     st.subheader("Shared fields")
-    year = st.number_input("Year", value=2026)
+    # Year input removed; code now uses date.today().year automatically
     client_code = st.text_input("Client Code", value="RNS")
     product_code = st.text_input("Product Code", value="BRA")
     start_date = st.date_input("Start date", value=date.today())
     end_date = st.date_input("End date", value=date.today())
     delivery_tag = st.text_input("Delivery tag (optional)")
     additional_info = st.text_input("Additional info (optional)")
-    delimiter = st.text_input("Delimiter", value="_")
 
     st.divider()
     st.subheader("Variants")
@@ -113,7 +163,7 @@ with left:
     messages = [line.strip() for line in messages_text.splitlines() if line.strip()]
 
 config = {
-    "year": year, "client_code": client_code, "product_code": product_code, 
+    "client_code": client_code, "product_code": product_code, 
     "start_date": start_date, "end_date": end_date,
     "delivery_tag": delivery_tag, "additional_info": additional_info, "delimiter": delimiter,
     "funnels": funnels, "regions": regions, "languages": languages, 
@@ -124,7 +174,6 @@ with right:
     st.subheader("Generate")
     mode = st.radio("Output format", ["Sheet mode (pivot by Size)", "Trafficking mode"], horizontal=True)
 
-    # Use session state to keep data alive during table edits
     if "df_flat" not in st.session_state:
         st.session_state.df_flat = None
 
@@ -136,17 +185,13 @@ with right:
             df_out = pivot_like_sheet(st.session_state.df_flat)
             st.markdown("### Output (sheet-style)")
             
-            # The editor captures user input
             edited_sheet = st.data_editor(
                 df_out,
                 use_container_width=True,
-                column_config={
-                    "URL": st.column_config.TextColumn("URL", help="Paste row-specific URLs here", width="large")
-                },
+                column_config={"URL": st.column_config.TextColumn("URL", help="Paste row-specific URLs here", width="large")},
                 key="sheet_editor"
             )
             
-            # Button pulls directly from the edited state
             st.download_button(
                 label="Download CSV",
                 data=edited_sheet.to_csv(index=False).encode('utf-8'),
