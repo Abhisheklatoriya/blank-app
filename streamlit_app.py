@@ -303,6 +303,11 @@ with left:
 
         st.session_state.durations = preset["durations"].copy()
 
+    def apply_social_platforms():
+        # Update sizes based on selected social platforms
+        platforms = st.session_state.get("social_platforms", [])
+        st.session_state.sizes = union_sizes(platforms)
+
     st.selectbox(
         "What kind of asset matrix?",
         options=list(ASSET_MATRIX_PRESETS.keys()),
@@ -310,13 +315,14 @@ with left:
         on_change=apply_asset_preset,
     )
 
-    ",
-            options=list(SOCIAL_PLATFORM_SIZES.keys()),
-            key="social_platforms",
-            default=list(SOCIAL_PLATFORM_SIZES.keys()),
-            on_change=apply_social_platforms,
-            help="Sizes auto-fill based on selected platforms.",
-        )
+    st.multiselect(
+        "Social platforms (affects Sizes when 'Social' is selected)",
+        options=list(SOCIAL_PLATFORM_SIZES.keys()),
+        key="social_platforms",
+        default=list(SOCIAL_PLATFORM_SIZES.keys()),
+        on_change=apply_social_platforms,
+        help="Sizes auto-fill based on selected platforms.",
+    )
 
     st.divider()
     st.subheader("Variants")
@@ -417,14 +423,21 @@ with right:
         if mode.startswith("Sheet"):
             df_out = pivot_like_sheet(df_flat)
             st.markdown("### Output (sheet-style)")
-            st.dataframe(df_out, use_container_width=True)heet mode)",
+            st.dataframe(df_out, use_container_width=True)
+
+            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
+            col_a, col_b = st.columns([1, 1], gap="small")
+            with col_a:
+                st.download_button(
+                    "Download CSV (sheet mode)",
                     data=csv_bytes,
                     file_name="naming_matrix_sheet_mode.csv",
                     mime="text/csv",
                     use_container_width=True,
                 )
             with col_b:
-                # Copy-to-clipboard (browser)
+                # Copy-to-clipboard (TSV for Sheets/Docs)
+                tsv = df_out.to_csv(index=False, sep="	")
                 copy_payload = json.dumps(tsv)
                 components.html(
                     f"""
@@ -449,26 +462,6 @@ with right:
                     height=55,
                 )
 
-            
-                "Download CSV (sheet mode)",
-                data=csv_bytes,
-                file_name="naming_matrix_sheet_mode.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-        else:
-            df_out = df_flat
-            st.markdown("### Output (trafficking-style)")
-            st.dataframe(df_out, use_container_width=True)
-            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "Download CSV (trafficking mode)",
-                data=csv_bytes,
-                file_name="naming_matrix_trafficking_mode.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
         # Warnings + duplicate names
         warn_count = (df_flat["Warnings"].astype(str).str.len() > 0).sum()
         if warn_count:
@@ -480,8 +473,7 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("
-".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
