@@ -135,12 +135,11 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
             "Asset Type": config.get("asset_type", ""),
             "Start Date": fmt_date(config["start_date"]),
             "End Date": fmt_date(config["end_date"]) if config.get("end_date") else "",
-            "URL": config.get("url", ""),
+            "URL": "", # Initialized as empty since global field is removed
         })
     return pd.DataFrame(rows)
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    # Added Start Date and End Date to the index
     idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "Start Date", "End Date"]
     pivot = df_flat.pivot_table(
         index=idx,
@@ -149,9 +148,8 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
         aggfunc="first",
     ).reset_index()
     
-    # Ensure URL is added as the last column
-    if "URL" not in pivot.columns:
-        pivot["URL"] = df_flat["URL"].iloc[0] if not df_flat.empty else ""
+    # Add empty URL column at the end
+    pivot["URL"] = ""
     
     return pivot
 
@@ -191,7 +189,9 @@ with left:
     product_code = st.text_input("Product Code", key="product_code")
     start_date = st.date_input("Start date", value=date.today())
     end_date = st.date_input("End date", value=date.today())
-    url = st.text_input("URL (optional)", value="", placeholder="https://...")
+    
+    # URL FIELD REMOVED FROM HERE
+    
     delivery_tag = st.text_input("Delivery tag (optional)", value="")
     additional_info = st.text_input("Additional info (optional)", value="")
     delimiter = st.text_input("Delimiter", value="_")
@@ -246,7 +246,7 @@ with left:
 
 config = {
     "year": year, "client_code": client_code, "product_code": product_code, "start_date": start_date, "end_date": end_date,
-    "url": url.strip(), "delivery_tag": delivery_tag.strip(), "additional_info": additional_info.strip(), "delimiter": delimiter,
+    "delivery_tag": delivery_tag.strip(), "additional_info": additional_info.strip(), "delimiter": delimiter,
     "asset_type": st.session_state.get("asset_type", ""), "funnels": funnels, "regions": regions, "languages": languages,
     "durations": durations, "sizes": sizes, "messages": messages,
 }
@@ -266,12 +266,11 @@ with right:
             df_out = pivot_like_sheet(df_flat)
             st.markdown("### Output (sheet-style)")
             
-            # Interactive table with URL as the last column
             edited_sheet = st.data_editor(
                 df_out,
                 use_container_width=True,
                 column_config={
-                    "URL": st.column_config.TextColumn("URL", help="Users can paste/edit URLs here", width="large")
+                    "URL": st.column_config.TextColumn("URL", help="Paste or edit row-specific URLs here", width="large")
                 },
                 key="sheet_editor"
             )
