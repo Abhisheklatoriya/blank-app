@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
+import json
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")
 
@@ -301,11 +303,6 @@ with left:
 
         st.session_state.durations = preset["durations"].copy()
 
-    def apply_social_platforms():
-        # Update sizes based on selected social platforms
-        platforms = st.session_state.get("social_platforms", [])
-        st.session_state.sizes = union_sizes(platforms)
-
     st.selectbox(
         "What kind of asset matrix?",
         options=list(ASSET_MATRIX_PRESETS.keys()),
@@ -313,14 +310,13 @@ with left:
         on_change=apply_asset_preset,
     )
 
-    st.multiselect(
-        "Social platforms (affects Sizes when 'Social' is selected)",
-        options=list(SOCIAL_PLATFORM_SIZES.keys()),
-        key="social_platforms",
-        default=list(SOCIAL_PLATFORM_SIZES.keys()),
-        on_change=apply_social_platforms,
-        help="Sizes auto-fill based on selected platforms.",
-    )
+    ",
+            options=list(SOCIAL_PLATFORM_SIZES.keys()),
+            key="social_platforms",
+            default=list(SOCIAL_PLATFORM_SIZES.keys()),
+            on_change=apply_social_platforms,
+            help="Sizes auto-fill based on selected platforms.",
+        )
 
     st.divider()
     st.subheader("Variants")
@@ -354,7 +350,13 @@ with left:
     messages_text = st.text_area(
         "",
         height=160,
-        value="Lower Costs\nTransparent Pricing\nPricing\nLatest Equipment\nManagement\nSupport\nSavings",
+        value="""Lower Costs
+Transparent Pricing
+Pricing
+Latest Equipment
+Management
+Support
+Savings""",
         placeholder="Paste messages here, one per line",
         label_visibility="collapsed",
     )
@@ -415,9 +417,39 @@ with right:
         if mode.startswith("Sheet"):
             df_out = pivot_like_sheet(df_flat)
             st.markdown("### Output (sheet-style)")
-            st.dataframe(df_out, use_container_width=True)
-            csv_bytes = df_out.to_csv(index=False).encode("utf-8")
-            st.download_button(
+            st.dataframe(df_out, use_container_width=True)heet mode)",
+                    data=csv_bytes,
+                    file_name="naming_matrix_sheet_mode.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+            with col_b:
+                # Copy-to-clipboard (browser)
+                copy_payload = json.dumps(tsv)
+                components.html(
+                    f"""
+                    <div style='display:flex; justify-content:flex-end;'>
+                      <button id='copyBtn' style='width:100%; padding:0.6rem 0.8rem; border-radius:0.5rem; border:1px solid rgba(49,51,63,0.2); background:white; cursor:pointer;'>Copy sheet</button>
+                    </div>
+                    <script>
+                      const tsv = {copy_payload};
+                      const btn = document.getElementById('copyBtn');
+                      btn.addEventListener('click', async () => {{
+                        try {{
+                          await navigator.clipboard.writeText(tsv);
+                          btn.innerText = 'Copied!';
+                          setTimeout(() => btn.innerText = 'Copy sheet', 1200);
+                        }} catch (e) {{
+                          btn.innerText = 'Copy failed';
+                          console.error(e);
+                        }}
+                      }});
+                    </script>
+                    """,
+                    height=55,
+                )
+
+            
                 "Download CSV (sheet mode)",
                 data=csv_bytes,
                 file_name="naming_matrix_sheet_mode.csv",
@@ -448,7 +480,8 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("
+".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
