@@ -156,18 +156,14 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
 
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    """Pivot to match your screenshot style: size columns with name inside cells."""
-    idx = ["Funnel", "Messaging", "Region", "Language", "Duration"]
+    """Pivot to match your screenshot style: size columns with name inside cells + editable URL."""
+    idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "URL"]
     pivot = df_flat.pivot_table(
         index=idx,
         columns="Size",
         values="Creative Name",
         aggfunc="first",
     ).reset_index()
-
-    # Optional: put sizes in a consistent order if present
-    size_cols = [c for c in pivot.columns if c not in idx]
-    # Keep as-is; you can sort sizes here if you want.
 
     return pivot
 
@@ -422,33 +418,62 @@ with right:
         dupes = df_flat[df_flat.duplicated(subset=["Creative Name"], keep=False)].copy()
 
         if mode.startswith("Sheet"):
-    df_out = pivot_like_sheet(df_flat)
-    st.markdown("### Output (sheet-style)")
+            df_out = pivot_like_sheet(df_flat)
+            st.markdown("### Output (sheet-style)")
 
-    # Add an editable URL column (defaults to the shared URL input)
-    default_url = (config.get("url") or "").strip()
-    if "URL" not in df_out.columns:
-        insert_at = df_out.columns.get_loc("Duration") + 1 if "Duration" in df_out.columns else len(df_out.columns)
-        df_out.insert(insert_at, "URL", [default_url] * len(df_out))
+            # Add an editable URL column (defaults to the shared URL input)
+            default_url = (config.get("url") or "").strip()
+            if "URL" not in df_out.columns:
+                insert_at = df_out.columns.get_loc("Duration") + 1 if "Duration" in df_out.columns else len(df_out.columns)
+                df_out.insert(insert_at, "URL", [default_url] * len(df_out))
 
-    edited_sheet = st.data_editor(
-        df_out,
-        use_container_width=True,
-        num_rows="fixed",
-        key="sheet_editor",
-        column_config={
-            "URL": st.column_config.TextColumn(
-                "URL",
-                help="Paste a full http(s) URL. You can edit per-row.",
-                width="large",
+            edited_sheet = st.data_editor(
+                df_out,
+                use_container_width=True,
+                num_rows="fixed",
+                key="sheet_editor",
+                column_config={
+                    "URL": st.column_config.TextColumn(
+                        "URL",
+                        help="Paste a full http(s) URL. You can edit per-row.",
+                        width="large",
+                    )
+                },
             )
-        },
-    )
 
-    # Light validation feedback (doesn't block)
-    invalid = edited_sheet["URL"].astype(str).apply(
-        lambda x: (x.strip() != "") and (not is_valid_url(x.strip()))
-    )
-    if invalid.any():
-        st.warning(f"{int(invalid.sum())} row(s) have an invalid URL (expected http(s)://...).")
+            # Light validation feedback (doesn't block)
+            invalid = edited_sheet["URL"].astype(str).apply(
+                lambda x: (x.strip() != "") and (not is_valid_url(x.strip()))
+            )
+            if invalid.any():
+                st.warning(f"{int(invalid.sum())} row(s) have an invalid URL (expected http(s)://...).")
 
+            # Optional: download the edited sheet (including URLs)
+            csv_bytes = edited_sheet.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "Download CSV (sheet mode)",
+                data=csv_bytes,
+                file_name="naming_matrix_sheet_mode.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+
+
+
+        # Warnings + duplicate names
+        warn_count = (df_flat["Warnings"].astype(str).str.len() > 0).sum()
+        if warn_count:
+            st.warning(f"Warnings found in {warn_count} row(s). Check the 'Warnings' column in trafficking mode.")
+
+        if not dupes.empty:
+            st.error(f"Duplicate creative names detected: {len(dupes)} rows share identical 'Creative Name'.")
+            st.dataframe(dupes[["Funnel","Messaging","Region","Language","Duration","Size","Creative Name"]], use_container_width=True)
+
+        # Copy-ready list
+        st.markdown("### Copy-ready list (one per line)")
+        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+
+st.caption(
+    "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
+)
