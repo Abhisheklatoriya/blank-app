@@ -327,7 +327,8 @@ with left:
 
     # Social platform selector (only when Social is selected)
     if st.session_state.asset_type == "Social":
-        SOCIAL_PLATFORMS = ASSET_MATRIX_PRESETS["Social"]["platforms"]
+        # FIX: use SOCIAL_PLATFORM_SIZES (defined above) instead of a non-existent key in ASSET_MATRIX_PRESETS
+        SOCIAL_PLATFORMS = SOCIAL_PLATFORM_SIZES
 
         if "social_platforms" not in st.session_state:
             st.session_state.social_platforms = list(SOCIAL_PLATFORMS.keys())
