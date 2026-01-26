@@ -289,12 +289,18 @@ with left:
     disable_duration = st.session_state.get("asset_type") == "Display"
 
     durations = st.multiselect(
-    "Duration",
-    options=["6s", "10s", "15s", "30s"],
-    key="durations",
-    default=st.session_state.durations,
-    disabled=disable_duration,
-)
+        "Duration",
+        options=["6s", "10s", "15s", "30s"],
+        key="durations",
+        default=st.session_state.durations,
+        disabled=disable_duration,
+    )
+
+        "Duration",
+        options=["6s", "10s", "15s", "30s"],
+        key="durations",
+        default=st.session_state.durations,
+    )
 
     sizes = st.multiselect(
         "Sizes",
