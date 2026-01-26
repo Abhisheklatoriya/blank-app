@@ -296,12 +296,6 @@ with left:
         disabled=disable_duration,
     )
 
-        "Duration",
-        options=["6s", "10s", "15s", "30s"],
-        key="durations",
-        default=st.session_state.durations,
-    )
-
     sizes = st.multiselect(
         "Sizes",
         options=["1x1", "4x3", "9x16", "16x9", "300x250", "300x600", "728x90", "160x600", "970x250"],
