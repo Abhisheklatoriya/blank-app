@@ -312,8 +312,6 @@ with left:
         label_visibility="collapsed",
     )
 
-    # Presets
-
 # Turn pasted lines into list
 messages = [line.strip() for line in messages_text.splitlines() if line.strip()]
 
@@ -328,6 +326,7 @@ config = {
     "delivery_tag": delivery_tag.strip(),
     "additional_info": additional_info.strip(),
     "delimiter": delimiter,
+    "asset_type": st.session_state.get("asset_type", ""),
     "funnels": funnels,
     "regions": regions,
     "languages": languages,
@@ -377,6 +376,15 @@ with right:
                 file_name="naming_matrix_sheet_mode.csv",
                 mime="text/csv",
                 use_container_width=True,
+            )
+
+            # Copy/paste-friendly sheet (TSV works well for Google Sheets & Docs)
+            st.markdown("### Copy entire sheet")
+            tsv = df_out.to_csv(index=False, sep="\t")
+            st.text_area(
+                "Copy this (Ctrl/Cmd+A → Ctrl/Cmd+C) and paste into your doc/sheet:",
+                value=tsv,
+                height=220,
             )
         else:
             df_out = df_flat
