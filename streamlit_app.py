@@ -319,21 +319,6 @@ with left:
     )
 
     # Presets
-    st.divider()
-    st.subheader("Presets")
-
-    p1, p2, p3 = st.columns(3)
-    if p1.button("Standard Social Pack", use_container_width=True):
-        sizes = ["1x1", "4x3", "9x16"]
-        durations = ["6s", "15s"]
-        regions = ["ROC", "QC"]
-        languages = ["EN", "FR"]
-    if p2.button("Video Pack", use_container_width=True):
-        sizes = ["16x9", "9x16"]
-        durations = ["6s", "15s", "30s"]
-    if p3.button("Display Pack", use_container_width=True):
-        sizes = ["300x250", "300x600", "728x90"]
-        durations = ["10s"]
 
 # Turn pasted lines into list
 messages = [line.strip() for line in messages_text.splitlines() if line.strip()]
