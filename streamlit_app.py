@@ -140,13 +140,19 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "URL"]
+    # Added Start Date and End Date to the index
+    idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "Start Date", "End Date"]
     pivot = df_flat.pivot_table(
         index=idx,
         columns="Size",
         values="Creative Name",
         aggfunc="first",
     ).reset_index()
+    
+    # Ensure URL is added as the last column
+    if "URL" not in pivot.columns:
+        pivot["URL"] = df_flat["URL"].iloc[0] if not df_flat.empty else ""
+    
     return pivot
 
 # ------------------------
@@ -260,7 +266,7 @@ with right:
             df_out = pivot_like_sheet(df_flat)
             st.markdown("### Output (sheet-style)")
             
-            # This is the interactive table where the URL column is editable
+            # Interactive table with URL as the last column
             edited_sheet = st.data_editor(
                 df_out,
                 use_container_width=True,
