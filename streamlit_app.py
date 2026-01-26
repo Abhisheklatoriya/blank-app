@@ -242,9 +242,22 @@ with left:
     st.subheader("Asset matrix type")
 
     # Asset matrix presets (edit these once, and AEs will be fast)
+    SOCIAL_PLATFORM_SIZES = {
+        "Meta": ["1x1", "9x16Story", "9x16Reel"],
+        "Pinterest": ["2x3"],
+        "Reddit": ["1x1"],
+    }
+
+    def union_sizes(platforms: list[str]) -> list[str]:
+        out: list[str] = []
+        for p in platforms:
+            for s in SOCIAL_PLATFORM_SIZES.get(p, []):
+                if s not in out:
+                    out.append(s)
+        return out
+
     ASSET_MATRIX_PRESETS = {
         "Social": {
-            "sizes": ["1x1", "4x3", "9x16", "16x9"],
             "durations": ["6s", "15s"],
         },
         "Display": {
@@ -257,11 +270,19 @@ with left:
         },
     }
 
+    # Session defaults
     if "asset_type" not in st.session_state:
         st.session_state.asset_type = "Social"
 
+    if "social_platforms" not in st.session_state:
+        st.session_state.social_platforms = list(SOCIAL_PLATFORM_SIZES.keys())
+
     if "sizes" not in st.session_state:
-        st.session_state.sizes = ASSET_MATRIX_PRESETS[st.session_state.asset_type]["sizes"].copy()
+        if st.session_state.asset_type == "Social":
+            st.session_state.sizes = union_sizes(st.session_state.social_platforms)
+        else:
+            st.session_state.sizes = ASSET_MATRIX_PRESETS[st.session_state.asset_type]["sizes"].copy()
+
     if "durations" not in st.session_state:
         st.session_state.durations = ASSET_MATRIX_PRESETS[st.session_state.asset_type]["durations"].copy()
 
@@ -269,7 +290,15 @@ with left:
         preset = ASSET_MATRIX_PRESETS.get(st.session_state.asset_type)
         if not preset:
             return
-        st.session_state.sizes = preset["sizes"].copy()
+
+        if st.session_state.asset_type == "Social":
+            # keep defaults if user cleared
+            if not st.session_state.get("social_platforms"):
+                st.session_state.social_platforms = list(SOCIAL_PLATFORM_SIZES.keys())
+            st.session_state.sizes = union_sizes(st.session_state.social_platforms)
+        else:
+            st.session_state.sizes = preset["sizes"].copy()
+
         st.session_state.durations = preset["durations"].copy()
 
     st.selectbox(
@@ -279,8 +308,42 @@ with left:
         on_change=apply_asset_preset,
     )
 
+    # Social platform selector (only when Social is selected)
+    if st.session_state.get("asset_type") == "Social":
+        def apply_social_platforms():
+            st.session_state.sizes = union_sizes(st.session_state.social_platforms)
+
+        st.multiselect(
+            "Platforms (Social)",
+            options=list(SOCIAL_PLATFORM_SIZES.keys()),
+            key="social_platforms",
+            default=list(SOCIAL_PLATFORM_SIZES.keys()),
+            on_change=apply_social_platforms,
+            help="Sizes auto-fill based on selected platforms.",
+        )
+
     st.divider()
     st.subheader("Variants")
+
+    # Social platform selector (only when Social is selected)
+    if st.session_state.asset_type == "Social":
+        SOCIAL_PLATFORMS = ASSET_MATRIX_PRESETS["Social"]["platforms"]
+
+        if "social_platforms" not in st.session_state:
+            st.session_state.social_platforms = list(SOCIAL_PLATFORMS.keys())
+
+        def apply_social_platforms():
+            sizes = []
+            for p in st.session_state.social_platforms:
+                sizes.extend(SOCIAL_PLATFORMS.get(p, []))
+            st.session_state.sizes = sorted(list(set(sizes)))
+
+        st.multiselect(
+            "Social platforms",
+            options=list(SOCIAL_PLATFORMS.keys()),
+            key="social_platforms",
+            on_change=apply_social_platforms,
+        )
 
     funnels = st.multiselect("Funnel", options=["AWR", "COS", "COV"], default=["AWR", "COS", "COV"])
     regions = st.multiselect("Region", options=["ROC", "QC", "ATL"], default=["ROC"])
@@ -298,7 +361,10 @@ with left:
 
     sizes = st.multiselect(
         "Sizes",
-        options=["1x1", "4x3", "9x16", "16x9", "300x250", "300x600", "728x90", "160x600", "970x250"],
+        options=[
+            "1x1", "2x3", "4x3", "9x16", "9x16Story", "9x16Reel", "16x9",
+            "300x250", "300x600", "728x90", "160x600", "970x250",
+        ],
         key="sizes",
         default=st.session_state.sizes,
     )
@@ -380,7 +446,7 @@ with right:
 
             # Copy/paste-friendly sheet (TSV works well for Google Sheets & Docs)
             st.markdown("### Copy entire sheet")
-            tsv = df_out.to_csv(index=False, sep="\t")
+            tsv = df_out.to_csv(index=False, sep="	")
             st.text_area(
                 "Copy this (Ctrl/Cmd+A → Ctrl/Cmd+C) and paste into your doc/sheet:",
                 value=tsv,
