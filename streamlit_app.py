@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
+import io
 
 # ------------------------
 # Helpers
@@ -16,7 +17,7 @@ def sanitize_freeform(s: str) -> str:
     return (s or "").replace("_", " ").strip()
 
 def build_name(year, client_code, product_code, language, funnel, region, messaging, size, start_date, duration, delivery_tag="", additional_info="", delimiter="_"):
-    messaging_clean = sanitize_freeform(messaging)
+    messaging_clean = sanitize_form = sanitize_freeform(messaging)
     additional_clean = sanitize_freeform(additional_info)
     date_part = fmt_date(start_date)
 
@@ -65,12 +66,11 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
             "Creative Name": name,
             "Start Date": fmt_date(config["start_date"]), 
             "End Date": fmt_date(config["end_date"]), 
-            "URL": "" # Empty for user to paste into
+            "URL": "" 
         })
     return pd.DataFrame(rows)
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    # URL is excluded from index to ensure it is added as the last column after pivoting
     idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "Start Date", "End Date"]
     pivot = df_flat.pivot_table(
         index=idx, 
@@ -78,8 +78,6 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
         values="Creative Name", 
         aggfunc="first"
     ).reset_index()
-    
-    # Force URL to the far right
     pivot["URL"] = ""
     return pivot
 
@@ -124,7 +122,6 @@ with right:
     st.subheader("Generate")
     mode = st.radio("Output format", ["Sheet mode (pivot by Size)", "Trafficking mode"], horizontal=True)
 
-    # Use session state to keep data alive during table edits
     if "df_flat" not in st.session_state:
         st.session_state.df_flat = None
 
@@ -136,24 +133,30 @@ with right:
             df_out = pivot_like_sheet(st.session_state.df_flat)
             st.markdown("### Output (sheet-style)")
             
-            # The editor captures user input
             edited_sheet = st.data_editor(
                 df_out,
                 use_container_width=True,
-                column_config={
-                    "URL": st.column_config.TextColumn("URL", help="Paste row-specific URLs here", width="large")
-                },
+                column_config={"URL": st.column_config.TextColumn("URL", width="large")},
                 key="sheet_editor"
             )
             
-            # Button pulls directly from the edited state
-            st.download_button(
-                label="Download CSV",
-                data=edited_sheet.to_csv(index=False).encode('utf-8'),
-                file_name=f"asset_matrix_{date.today()}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            # --- Export Options ---
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.download_button(
+                    label="⬇️ Download CSV",
+                    data=edited_sheet.to_csv(index=False).encode('utf-8'),
+                    file_name=f"badger_matrix_{date.today()}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            
+            with col2:
+                # Format data for easy copy-pasting into Google Sheets
+                tsv_data = edited_sheet.to_csv(index=False, sep='\t')
+                st.copy_to_clipboard(tsv_data, label="📋 Copy for Google Sheets", help="Click then paste (Ctrl+V) into cell A1 of a Google Sheet")
+
         else:
             st.dataframe(st.session_state.df_flat, use_container_width=True)
 
