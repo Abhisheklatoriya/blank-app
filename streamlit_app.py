@@ -308,13 +308,18 @@ with left:
         on_change=apply_asset_preset,
     )
 
-    ",
-            options=list(SOCIAL_PLATFORM_SIZES.keys()),
-            key="social_platforms",
-            default=list(SOCIAL_PLATFORM_SIZES.keys()),
-            on_change=apply_social_platforms,
-            help="Sizes auto-fill based on selected platforms.",
-        )
+    def apply_social_platforms():
+        # Update sizes when social platforms selection changes
+        st.session_state.sizes = union_sizes(st.session_state.get("social_platforms", []))
+
+    st.multiselect(
+        "Social platforms",
+        options=list(SOCIAL_PLATFORM_SIZES.keys()),
+        key="social_platforms",
+        default=list(SOCIAL_PLATFORM_SIZES.keys()),
+        on_change=apply_social_platforms,
+        help="Sizes auto-fill based on selected platforms.",
+    )
 
     st.divider()
     st.subheader("Variants")
@@ -448,8 +453,7 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("
-".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
