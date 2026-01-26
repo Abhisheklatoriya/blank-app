@@ -422,24 +422,33 @@ with right:
         dupes = df_flat[df_flat.duplicated(subset=["Creative Name"], keep=False)].copy()
 
         if mode.startswith("Sheet"):
-            df_out = pivot_like_sheet(df_flat)
-            st.markdown("### Output (sheet-style)")
-            st.dataframe(df_out, use_container_width=True)
+    df_out = pivot_like_sheet(df_flat)
+    st.markdown("### Output (sheet-style)")
 
+    # Add an editable URL column (defaults to the shared URL input)
+    default_url = (config.get("url") or "").strip()
+    if "URL" not in df_out.columns:
+        insert_at = df_out.columns.get_loc("Duration") + 1 if "Duration" in df_out.columns else len(df_out.columns)
+        df_out.insert(insert_at, "URL", [default_url] * len(df_out))
 
-        # Warnings + duplicate names
-        warn_count = (df_flat["Warnings"].astype(str).str.len() > 0).sum()
-        if warn_count:
-            st.warning(f"Warnings found in {warn_count} row(s). Check the 'Warnings' column in trafficking mode.")
+    edited_sheet = st.data_editor(
+        df_out,
+        use_container_width=True,
+        num_rows="fixed",
+        key="sheet_editor",
+        column_config={
+            "URL": st.column_config.TextColumn(
+                "URL",
+                help="Paste a full http(s) URL. You can edit per-row.",
+                width="large",
+            )
+        },
+    )
 
-        if not dupes.empty:
-            st.error(f"Duplicate creative names detected: {len(dupes)} rows share identical 'Creative Name'.")
-            st.dataframe(dupes[["Funnel","Messaging","Region","Language","Duration","Size","Creative Name"]], use_container_width=True)
+    # Light validation feedback (doesn't block)
+    invalid = edited_sheet["URL"].astype(str).apply(
+        lambda x: (x.strip() != "") and (not is_valid_url(x.strip()))
+    )
+    if invalid.any():
+        st.warning(f"{int(invalid.sum())} row(s) have an invalid URL (expected http(s)://...).")
 
-        # Copy-ready list
-        st.markdown("### Copy-ready list (one per line)")
-        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
-
-st.caption(
-    "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
-)
