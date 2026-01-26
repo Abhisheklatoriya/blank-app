@@ -308,13 +308,7 @@ with left:
         on_change=apply_asset_preset,
     )
 
-    # Social platform selector (only when Social is selected)
-    if st.session_state.get("asset_type") == "Social":
-        def apply_social_platforms():
-            st.session_state.sizes = union_sizes(st.session_state.social_platforms)
-
-        st.multiselect(
-            "Platforms (Social)",
+    ",
             options=list(SOCIAL_PLATFORM_SIZES.keys()),
             key="social_platforms",
             default=list(SOCIAL_PLATFORM_SIZES.keys()),
@@ -354,13 +348,13 @@ with left:
     messages_text = st.text_area(
         "",
         height=160,
-        value="""Lower Costs
+        value="Lower Costs
 Transparent Pricing
 Pricing
 Latest Equipment
 Management
 Support
-Savings""",
+Savings",
         placeholder="Paste messages here, one per line",
         label_visibility="collapsed",
     )
@@ -430,15 +424,6 @@ with right:
                 mime="text/csv",
                 use_container_width=True,
             )
-
-            # Copy/paste-friendly sheet (TSV works well for Google Sheets & Docs)
-            st.markdown("### Copy entire sheet")
-            tsv = df_out.to_csv(index=False, sep="	")
-            st.text_area(
-                "Copy this (Ctrl/Cmd+A → Ctrl/Cmd+C) and paste into your doc/sheet:",
-                value=tsv,
-                height=220,
-            )
         else:
             df_out = df_flat
             st.markdown("### Output (trafficking-style)")
@@ -463,7 +448,8 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("
+".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
