@@ -354,13 +354,13 @@ with left:
     messages_text = st.text_area(
         "",
         height=160,
-        value="Lower Costs
+        value="""Lower Costs
 Transparent Pricing
 Pricing
 Latest Equipment
 Management
 Support
-Savings",
+Savings""",
         placeholder="Paste messages here, one per line",
         label_visibility="collapsed",
     )
@@ -463,8 +463,7 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("
-".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
