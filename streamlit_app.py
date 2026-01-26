@@ -3,6 +3,60 @@ import pandas as pd
 from datetime import date, datetime
 import itertools
 from urllib.parse import urlparse
+import streamlit.components.v1 as components
+
+# ------------------------
+# Aesthetic Feature: Eye-Tracking Badger
+# ------------------------
+def add_tracking_badger():
+    # This creates a custom HTML/JS component where the pupils follow the mouse
+    badger_html = """
+    <div id="badger-container" style="display: flex; justify-content: center; align-items: center; padding: 10px; background: #f0f2f6; border-radius: 15px;">
+        <svg width="180" height="140" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="50" r="15" fill="#222" />
+            <circle cx="140" cy="50" r="15" fill="#222" />
+            <path d="M40 80 Q100 20 160 80 Q160 140 100 150 Q40 140 40 80" fill="#222" />
+            <path d="M65 80 Q100 45 135 80 Q135 110 100 125 Q65 110 65 80" fill="white" />
+            <circle cx="85" cy="85" r="10" fill="white" stroke="#333" stroke-width="1"/>
+            <circle cx="115" cy="85" r="10" fill="white" stroke="#333" stroke-width="1"/>
+            <circle id="left-pupil" cx="85" cy="85" r="4" fill="black" />
+            <circle id="right-pupil" cx="115" cy="85" r="4" fill="black" />
+            <ellipse cx="100" cy="108" rx="8" ry="5" fill="#111" />
+        </svg>
+    </div>
+
+    <script>
+        const leftPupil = document.getElementById('left-pupil');
+        const rightPupil = document.getElementById('right-pupil');
+        
+        const leftEyePos = { x: 85, y: 85 };
+        const rightEyePos = { x: 115, y: 85 };
+
+        document.addEventListener('mousemove', (e) => {
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+
+            function movePupil(pupil, origin) {
+                const rect = pupil.getBoundingClientRect();
+                const eyeX = rect.left + rect.width / 2;
+                const eyeY = rect.top + rect.height / 2;
+
+                const angle = Math.atan2(mouseY - eyeY, mouseX - eyeX);
+                const distance = 3.5; 
+                
+                const newX = origin.x + Math.cos(angle) * distance;
+                const newY = origin.y + Math.sin(angle) * distance;
+                
+                pupil.setAttribute('cx', newX);
+                pupil.setAttribute('cy', newY);
+            }
+
+            movePupil(leftPupil, leftEyePos);
+            movePupil(rightPupil, rightEyePos);
+        });
+    </script>
+    """
+    components.html(badger_html, height=160)
 
 # ------------------------
 # Helpers
@@ -65,12 +119,11 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
             "Creative Name": name,
             "Start Date": fmt_date(config["start_date"]), 
             "End Date": fmt_date(config["end_date"]), 
-            "URL": "" # Empty for user to paste into
+            "URL": "" 
         })
     return pd.DataFrame(rows)
 
 def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
-    # URL is excluded from index to ensure it is added as the last column after pivoting
     idx = ["Funnel", "Messaging", "Region", "Language", "Duration", "Start Date", "End Date"]
     pivot = df_flat.pivot_table(
         index=idx, 
@@ -79,7 +132,7 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
         aggfunc="first"
     ).reset_index()
     
-    # Force URL to the far right
+    # Ensure URL is the final column
     pivot["URL"] = ""
     return pivot
 
@@ -87,6 +140,15 @@ def pivot_like_sheet(df_flat: pd.DataFrame) -> pd.DataFrame:
 # UI Setup
 # ------------------------
 st.set_page_config(page_title="Badger – Asset Matrix Generator", page_icon="🦡", layout="wide")
+
+with st.sidebar:
+    st.markdown("### Badger Guardian")
+    add_tracking_badger()
+    st.caption("He watches the cursor. He sees all.")
+    st.divider()
+    st.markdown("### Settings")
+    delimiter = st.text_input("Global Delimiter", value="_")
+
 st.title("🦡 Badger")
 
 left, right = st.columns([1, 1.35], gap="large")
@@ -100,7 +162,6 @@ with left:
     end_date = st.date_input("End date", value=date.today())
     delivery_tag = st.text_input("Delivery tag (optional)")
     additional_info = st.text_input("Additional info (optional)")
-    delimiter = st.text_input("Delimiter", value="_")
 
     st.divider()
     st.subheader("Variants")
@@ -108,8 +169,8 @@ with left:
     regions = st.multiselect("Region", ["ROC", "QC", "ATL"], default=["ROC"])
     languages = st.multiselect("Language", ["EN", "FR"], default=["EN", "FR"])
     durations = st.multiselect("Duration", ["6s", "15s", "30s"], default=["6s", "15s"])
-    sizes = st.multiselect("Sizes", ["1x1", "9x16Story", "9x16Reel", "16x9"], default=["1x1", "9x16Story"])
-    messages_text = st.text_area("Messaging", value="Lower Costs\nSupport\nTransparent Pricing")
+    sizes = st.multiselect("Sizes", ["1x1", "9x16Story", "9x16Reel", "16x9", "300x250", "728x90"], default=["1x1", "9x16Story"])
+    messages_text = st.text_area("Messaging (one per line)", value="Lower Costs\nSupport\nTransparent Pricing")
     messages = [line.strip() for line in messages_text.splitlines() if line.strip()]
 
 config = {
@@ -124,19 +185,21 @@ with right:
     st.subheader("Generate")
     mode = st.radio("Output format", ["Sheet mode (pivot by Size)", "Trafficking mode"], horizontal=True)
 
-    # Use session state to keep data alive during table edits
     if "df_flat" not in st.session_state:
         st.session_state.df_flat = None
 
     if st.button("Generate naming conventions", type="primary", use_container_width=True):
-        st.session_state.df_flat = cartesian_generate(config)
+        if not messages:
+            st.warning("Please add at least one line of messaging.")
+        else:
+            st.session_state.df_flat = cartesian_generate(config)
 
     if st.session_state.df_flat is not None:
         if mode.startswith("Sheet"):
             df_out = pivot_like_sheet(st.session_state.df_flat)
             st.markdown("### Output (sheet-style)")
             
-            # The editor captures user input
+            # The editor captures the actual URL data you paste
             edited_sheet = st.data_editor(
                 df_out,
                 use_container_width=True,
@@ -146,7 +209,7 @@ with right:
                 key="sheet_editor"
             )
             
-            # Button pulls directly from the edited state
+            # This download button pulls from 'edited_sheet' so URLs are included
             st.download_button(
                 label="Download CSV",
                 data=edited_sheet.to_csv(index=False).encode('utf-8'),
@@ -155,7 +218,9 @@ with right:
                 use_container_width=True
             )
         else:
+            st.markdown("### Output (flat-list)")
             st.dataframe(st.session_state.df_flat, use_container_width=True)
 
+        st.divider()
         st.markdown("### Copy-ready list")
         st.code("\n".join(st.session_state.df_flat["Creative Name"].tolist()), language=None)
