@@ -255,7 +255,7 @@ with right:
     st.subheader("Generate")
     
     total_names = len(funnels) * len(regions) * len(languages) * len(durations) * len(sizes) * len(messages)
-    st.info(f"Generating **{total_names:,}** creative names for **{date.today().year}**.")
+    st.info(f"Generating **{total_names:,}** creative names.")
     
     mode = st.radio("Output format", ["Sheet mode (pivot by Size)", "Trafficking mode"], horizontal=True)
 
