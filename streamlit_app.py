@@ -325,30 +325,10 @@ with left:
     st.divider()
     st.subheader("Variants")
 
-    # Social platform selector (only when Social is selected)
-    if st.session_state.asset_type == "Social":
-        # FIX: use SOCIAL_PLATFORM_SIZES (defined above) instead of a non-existent key in ASSET_MATRIX_PRESETS
-        SOCIAL_PLATFORMS = SOCIAL_PLATFORM_SIZES
-
-        if "social_platforms" not in st.session_state:
-            st.session_state.social_platforms = list(SOCIAL_PLATFORMS.keys())
-
-        def apply_social_platforms():
-            sizes = []
-            for p in st.session_state.social_platforms:
-                sizes.extend(SOCIAL_PLATFORMS.get(p, []))
-            st.session_state.sizes = sorted(list(set(sizes)))
-
-        st.multiselect(
-            "Social platforms",
-            options=list(SOCIAL_PLATFORMS.keys()),
-            key="social_platforms",
-            on_change=apply_social_platforms,
-        )
-
     funnels = st.multiselect("Funnel", options=["AWR", "COS", "COV"], default=["AWR", "COS", "COV"])
     regions = st.multiselect("Region", options=["ROC", "QC", "ATL"], default=["ROC"])
     languages = st.multiselect("Language", options=["EN", "FR"], default=["EN", "FR"])
+
     # Disable duration selection for Display assets
     disable_duration = st.session_state.get("asset_type") == "Display"
 
@@ -374,7 +354,13 @@ with left:
     messages_text = st.text_area(
         "",
         height=160,
-        value="Lower Costs\nTransparent Pricing\nPricing\nLatest Equipment\nManagement\nSupport\nSavings",
+        value="Lower Costs
+Transparent Pricing
+Pricing
+Latest Equipment
+Management
+Support
+Savings",
         placeholder="Paste messages here, one per line",
         label_visibility="collapsed",
     )
@@ -477,7 +463,8 @@ with right:
 
         # Copy-ready list
         st.markdown("### Copy-ready list (one per line)")
-        st.code("\n".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
+        st.code("
+".join(df_flat["Creative Name"].astype(str).tolist()), language=None)
 
 st.caption(
     "Tip: If your official naming order differs, edit the `parts = [...]` list inside `build_name()` to match Rogers rules."
