@@ -4,178 +4,178 @@ from datetime import date
 import itertools
 
 # ------------------------
-# 1. Page Configuration & Professional Styling
+# 1. Page Configuration & Custom Compact Styling
 # ------------------------
 st.set_page_config(page_title="Badger | Asset Matrix", page_icon="🦡", layout="wide")
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
-    .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label { font-weight: 600; font-size: 0.95rem; }
+    .main-header { font-size: 2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
+    .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label { font-weight: 600; font-size: 0.85rem; }
+    
+    /* FIX: Shrink Multiselect Tags to hug text */
+    div[data-baseweb="tag"] {
+        height: 22px !important;
+        padding: 0px 6px !important;
+        font-size: 0.75rem !important;
+        margin: 2px !important;
+    }
+    .stMultiSelect div div div div {
+        min-height: 32px !important; /* Reduces vertical bulk of the input box */
+    }
+    
     .info-box { background-color: #f0f2f6; padding: 1rem; border-radius: 8px; border-left: 5px solid #FF4B4B; margin-bottom: 1rem; }
-    /* Improve multiselect tag visibility */
-    .stMultiSelect div div div div { background-color: #FF4B4B !important; color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------
-# 2. Taxonomy Data & Helper Functions
+# 2. Reference Data & Logic
 # ------------------------
-# Sourced from Client/Product Code Tables
-CLIENT_CODES = {
-    "RCP": "ROGERS CORPORATE BRAND",
-    "RHE": "CONNECTED HOME",
-    "RCS": "CONSUMER WIRELESS",
-    "RNS": "ROGERS BUSINESS",
-    "RBG": "ROGERS BANK",
-    "RSH": "ROGERS SHAW DIRECT"
-}
-
-PRODUCT_CODES = {
-    "RCB": "CORPORATE BRAND", "TSP": "TITLING SPONSORSHIP", "FIN": "FIDO INTERNET",
-    "IGN": "IGNITE", "SHM": "SMART HOME MONITORING", "CWI": "CHATR",
-    "FWI": "FIDO WIRELESS", "IDV": "INDIVIDUALLY LIABLE", "RWI": "ROGERS WIRELESS",
-    "SOH": "SOHO", "BRA": "BRAND", "INT": "INTERNET", "WLS": "WIRELESS",
-    "FIB": "FIBRE", "IOT": "IOT", "CBL": "CABLE", "RBK": "ROGERS BANK"
+LOB_MAP = {
+    "Consumer Wireless": {"client": "RCS", "product": "WLS"},
+    "Connected Home": {"client": "RHE", "product": "IGN"},
+    "Rogers Business": {"client": "RNS", "product": "BRA"},
+    "Rogers Bank": {"client": "RBG", "product": "RBK"},
+    "Corporate Brand": {"client": "RCP", "product": "RCB"},
+    "Shaw Direct": {"client": "RSH", "product": "CBL"},
 }
 
 def fmt_date(d: date) -> str:
-    """Format: MMM.DD.YYYY (e.g., Jun.27.2025)"""
+    """Format: MMM.dd.yyyy (e.g., Jun.27.2025)"""
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
     return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
 
 def clean_val(s: str) -> str:
-    """Strict Rule: No underscores allowed in free-form fields."""
+    """Enforces No Underscore Allowed rule"""
     return (s or "").replace("_", " ").strip()
 
 # ------------------------
-# 3. Main UI Layout
+# 3. Sidebar / Input Panel
 # ------------------------
+if "lob_choice" not in st.session_state:
+    st.session_state.lob_choice = "Connected Home"
+
+curr_lob = LOB_MAP[st.session_state.lob_choice]
+
 st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', unsafe_allow_html=True)
 
-left, right = st.columns([1.1, 1.9], gap="large")
+left, right = st.columns([1, 2], gap="medium")
 
 with left:
-    # --- SECTION 1: Identity ---
     with st.container(border=True):
-        st.markdown("### 📋 1. Identity & Codes")
-        client_choice = st.selectbox("Client Code", options=list(CLIENT_CODES.keys()), 
-                                     format_func=lambda x: f"{x} - {CLIENT_CODES[x]}")
-        product_choice = st.selectbox("Product Code", options=list(PRODUCT_CODES.keys()),
-                                      format_func=lambda x: f"{x} - {PRODUCT_CODES[x]}")
+        st.markdown("### 📋 1. Identity")
+        st.selectbox("Line of Business", options=list(LOB_MAP.keys()), key="lob_choice")
+        
+        c1, c2 = st.columns(2)
+        client_code = c1.text_input("Client", value=curr_lob["client"])
+        product_code = c2.text_input("Product", value=curr_lob["product"])
         
         d1, d2 = st.columns(2)
         start_date = d1.date_input("Start Date", value=date.today())
         end_date = d2.date_input("End Date", value=date(2026, 3, 31))
         delivery_date = st.date_input("Delivery Date", value=date.today())
 
-    # --- SECTION 2: Campaign Builder ---
     with st.container(border=True):
         st.markdown("### 🏗️ 2. Campaign Builder")
         camp_title = st.text_input("Campaign Title (Free Form)", value="Q3 Comwave QC")
         
-        # Expanded columns to fix visibility issues
-        f_col, r_col = st.columns(2)
+        # Tags are now styled to be compact
+        f_col, r_col, l_col = st.columns(3)
         funnels = f_col.multiselect("Funnel", ["COS", "AWR", "COV", "D3B", "D3Y", "PNX"], default=["COS"])
         regions = r_col.multiselect("Region", ["ATL", "ROC", "QC", "Halifax"], default=["ATL"])
-        
-        languages = st.multiselect("Language", ["EN", "FR"], default=["EN"])
+        languages = l_col.multiselect("Language", ["EN", "FR"], default=["EN"])
         
         msg_input = st.text_area("Messaging (one per line)", value="Internet Offer V1")
 
-    # --- SECTION 3: Asset Specs ---
     with st.container(border=True):
         st.markdown("### 🎨 3. Asset Specs")
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
-        # Sizes formatted as headers in the final spreadsheet
-        available_sizes = ["1x1 Meta", "2x3 Pinterest", "9x16 Story", "9x16 Reel", "16x9", "300x250"]
-        selected_sizes = st.multiselect("Sizes", available_sizes, default=available_sizes[:4])
-        extension = st.selectbox("File Extension", [".zip", ".mp4", ".jpg", ".html"], index=0)
+        # Columns used for the spreadsheet layout
+        sheet_sizes = ["1x1 Meta", "2x3 Pinterest", "9x16 Story", "9x16 Reel"]
+        selected_sizes = st.multiselect("Sizes", sheet_sizes + ["16x9", "300x250"], default=sheet_sizes)
+        extension = st.selectbox("Extension", [".zip", ".mp4", ".jpg", ".html"], index=0)
 
 # ------------------------
 # 4. Generation Logic
 # ------------------------
-if st.button("🚀 Generate Full Asset Matrix", type="primary", use_container_width=True):
+if st.button("🚀 Generate Final Matrix", type="primary", use_container_width=True):
     messages = [m.strip() for m in msg_input.splitlines() if m.strip()]
     
-    # Cartesian product for all variations
+    # Cartesian product of all variations
     combos = itertools.product(funnels, messages, regions, languages, durations, selected_sizes)
-    flat_data = []
+    rows = []
 
     for f, m, r, l, dur, siz in combos:
-        # Hierarchy Build: Year_Client_Product_Lang_Campaign_Messaging_Size_Date_AddInfo
-        
-        # 1. Campaign Name includes Funnel, Region, Language
+        # Build Campaign Name: Title-Funnel-Region-Lang
         full_camp = f"{camp_title}-{f}-{r}-{l}"
         
-        # 2. Additional Info includes Duration and Extension
+        # Build Additional Info: Duration + Extension
         add_info = f"{dur}{extension}"
         
-        # 3. Size Part (First word of label, e.g., '1x1')
-        size_code = siz.split()[0]
+        # Dimensions for naming convention (e.g., '1x1')
+        dim = siz.split()[0]
 
+        # Year_Client_Prod_Lang_Camp_Msg_Size_Date_AddInfo
         name_parts = [
             "2026",
-            client_choice,
-            product_choice,
+            client_code.strip(),
+            product_code.strip(),
             l,
             clean_val(full_camp),
             clean_val(m),
-            size_code,
+            dim,
             fmt_date(start_date),
             clean_val(add_info)
         ]
         
-        creative_name = "_".join(name_parts)
-
-        flat_data.append({
+        rows.append({
             "FUNNEL": f,
             "MESSAGING": m,
             "REGION": r,
             "LANGUAGE": l,
             "DURATION": dur,
-            "SizeLabel": siz,
-            "Creative Name": creative_name
+            "SizeHeader": siz,
+            "Convention": "_".join(name_parts)
         })
 
-    if flat_data:
-        df_flat = pd.DataFrame(flat_data)
+    if rows:
+        df = pd.DataFrame(rows)
         
-        # Pivot to mirror the spreadsheet layout
-        pivot_df = df_flat.pivot_table(
+        # Pivot to create spreadsheet view
+        pivot_df = df.pivot_table(
             index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"],
-            columns="SizeLabel",
-            values="Creative Name",
+            columns="SizeHeader",
+            values="Convention",
             aggfunc="first"
         ).reset_index()
 
-        # Add Metadata columns per screenshot
+        # Add Metadata columns
         pivot_df["DELIVERY DATE"] = fmt_date(delivery_date)
         pivot_df["START DATE"] = fmt_date(start_date)
         pivot_df["END DATE"] = fmt_date(end_date)
         pivot_df["URL"] = "https://www.rogers.com"
 
-        st.session_state.matrix_ready = pivot_df
+        st.session_state.matrix_final = pivot_df
 
 # ------------------------
-# 5. Results Display
+# 5. Output Display
 # ------------------------
 with right:
-    if "matrix_ready" in st.session_state:
-        st.markdown("### 📊 Generated Spreadsheet View")
-        # Display the pivoted matrix exactly like the spreadsheet screenshot
-        st.dataframe(st.session_state.matrix_ready, use_container_width=True, hide_index=True)
+    if "matrix_final" in st.session_state:
+        st.markdown(f'<div class="info-box">Generated **{len(st.session_state.matrix_final)}** row variations.</div>', unsafe_allow_html=True)
         
-        # Actions
-        col_dl, col_copy = st.columns(2)
-        csv = st.session_state.matrix_ready.to_csv(index=False).encode('utf-8')
-        col_dl.download_button("📥 Download Excel/CSV", data=csv, file_name=f"Asset_Matrix_{date.today()}.csv", use_container_width=True)
+        # Show spreadsheet-style preview
+        st.dataframe(st.session_state.matrix_final, use_container_width=True, hide_index=True)
         
-        st.markdown("### 📝 All Generated Conventions")
-        all_names = []
-        for col in st.session_state.matrix_ready.columns:
-            if col not in ["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION", "DELIVERY DATE", "START DATE", "END DATE", "URL"]:
-                all_names.extend(st.session_state.matrix_ready[col].dropna().tolist())
-        st.code("\n".join(all_names), language=None)
+        # Download
+        csv = st.session_state.matrix_final.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Asset Matrix CSV", data=csv, file_name=f"Asset_Matrix_{date.today()}.csv", use_container_width=True)
+        
+        with st.expander("📋 View All Conventions (Flat List)"):
+            all_names = []
+            for col in st.session_state.matrix_final.columns:
+                if col not in ["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION", "DELIVERY DATE", "START DATE", "END DATE", "URL"]:
+                    all_names.extend(st.session_state.matrix_final[col].dropna().tolist())
+            st.code("\n".join(all_names), language=None)
     else:
-        st.info("Fill out the parameters and click Generate to build the matrix.")
+        st.info("Fill out the Campaign Builder and click Generate to see the matrix.")
