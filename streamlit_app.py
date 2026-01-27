@@ -4,7 +4,7 @@ from datetime import date
 import itertools
 
 # ------------------------
-# 1. Page Configuration & Professional Styling
+# 1. Page Configuration & Styling
 # ------------------------
 st.set_page_config(page_title="Badger | Asset Matrix", page_icon="🦡", layout="wide")
 
@@ -12,7 +12,7 @@ st.markdown("""
 <style>
     .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
     
-    /* Selection tags are large and adapt to text width */
+    /* Selection tags formatting */
     div[data-baseweb="tag"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -24,26 +24,22 @@ st.markdown("""
     div[data-baseweb="tag"] span {
         font-size: 0.95rem !important;
         font-weight: 600 !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
     }
     .stMultiSelect div[data-baseweb="select"] > div {
         min-height: 48px !important;
     }
     
-    /* Standardize button size */
+    /* Standard button sizing */
     div.stButton > button {
         width: auto !important;
         padding-left: 30px !important;
         padding-right: 30px !important;
     }
-    
-    .info-box { background-color: #f0f2f6; padding: 1rem; border-radius: 8px; border-left: 5px solid #FF4B4B; margin-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------
-# 2. Taxonomy Data
+# 2. Taxonomy Reference Data
 # ------------------------
 CLIENT_CODES = {
     "RCP": "ROGERS CORPORATE BRAND",
@@ -64,16 +60,14 @@ PLATFORM_SIZES = {
 }
 
 def fmt_date(d: date) -> str:
-    """Format: XXXdd.yyyy (e.g., Jun.27.2025)"""
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
     return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
 
 def clean_val(s: str) -> str:
-    """Rule: No Underscore Allowed in Free Form Fields"""
     return (s or "").replace("_", " ").strip()
 
 # ------------------------
-# 3. Main UI Layout
+# 3. Sidebar / Input Panel
 # ------------------------
 st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', unsafe_allow_html=True)
 
@@ -120,14 +114,11 @@ with left:
         st.markdown("### 🎨 4. Asset Specs")
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
         selected_sizes = st.multiselect("Sizes", options=sorted(list(set(suggested_sizes + ["16x9"]))), default=suggested_sizes)
-        
-        # Free form suffix to add at the end of the convention
         custom_suffix = st.text_input("Custom Suffix (Free Form)", placeholder="e.g. V1, Final")
 
 # ------------------------
-# 4. Generation & Pivot Logic
+# 4. Processing & Pivot Logic
 # ------------------------
-# Button is now standard width
 if st.button("🚀 Generate Asset Matrix", type="primary"):
     messages = [m.strip() for m in msg_input.splitlines() if m.strip()]
     combos = itertools.product(funnels, messages, regions, langs, durations, selected_sizes)
@@ -137,7 +128,6 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
         full_campaign = f"{camp_title}-{f}-{r}-{l}"
         size_code = siz.split()[0]
         
-        # Core Taxonomy Parts
         name_parts = [
             "2026",
             c_code,
@@ -150,7 +140,6 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
             clean_val(dur)
         ]
         
-        # Append Custom Suffix if present
         creative_name = "_".join(name_parts)
         if custom_suffix:
             creative_name += f"_{clean_val(custom_suffix)}"
@@ -167,22 +156,37 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
             columns="SizeLabel", values="Creative Name", aggfunc="first"
         ).reset_index()
 
+        # Add manual entry columns
         pivot_df["DELIVERY DATE"] = fmt_date(delivery_date)
         pivot_df["START DATE"] = fmt_date(start_date)
         pivot_df["END DATE"] = fmt_date(end_date)
-        pivot_df["URL"] = "https://www.rogers.com"
+        pivot_df["URL"] = "" # Leave empty for user input
         
-        st.session_state.matrix_ready = pivot_df
+        st.session_state.matrix_df = pivot_df
 
 # ------------------------
-# 5. Results Preview
+# 5. Output with Data Editor
 # ------------------------
 with right:
-    if "matrix_ready" in st.session_state:
-        st.markdown(f"### 📊 Generated {matrix_type} Matrix")
-        st.dataframe(st.session_state.matrix_ready, use_container_width=True, hide_index=True)
+    if "matrix_df" in st.session_state:
+        st.markdown(f"### 📊 Edit {matrix_type} Matrix")
+        st.caption("You can edit any cell below. Paste your URLs into the 'URL' column.")
         
-        csv = st.session_state.matrix_ready.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Final Sheet", data=csv, file_name=f"Asset_Matrix_{matrix_type}.csv")
+        # Enable editing for the entire dataframe
+        edited_df = st.data_editor(
+            st.session_state.matrix_df, 
+            use_container_width=True, 
+            hide_index=True,
+            num_rows="dynamic" # Allows adding/deleting rows if needed
+        )
+        
+        # Download the EDITED version
+        csv = edited_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Download Final Sheet", 
+            data=csv, 
+            file_name=f"Asset_Matrix_{matrix_type}.csv",
+            mime='text/csv'
+        )
     else:
-        st.info("Adjust settings on the left and click Generate.")
+        st.info("Configure the matrix and click Generate to view the editable output.")
