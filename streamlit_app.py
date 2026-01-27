@@ -107,13 +107,14 @@ with left:
         
         msg_input = st.text_area("Messaging (one per line)", value="Internet Offer V1")
 
-    # --- SECTION 4: Asset Specs (Pre-filled) ---
+    # --- SECTION 4: Asset Specs ---
     with st.container(border=True):
         st.markdown("### 🎨 4. Asset Specs")
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
-        
-        # Pre-fills sizes based on Matrix Type + Platform selection
         selected_sizes = st.multiselect("Sizes", options=sorted(list(set(suggested_sizes + ["16x9"]))), default=suggested_sizes)
+        
+        # NEW: Field for custom free-form character suffix
+        custom_suffix = st.text_input("Custom Suffix (Optional)", placeholder="e.g. V1, Final, Alpha")
 
 # ------------------------
 # 4. Generation & Pivot Logic
@@ -128,6 +129,7 @@ if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=T
         full_campaign = f"{camp_title}-{f}-{r}-{l}"
         size_code = siz.split()[0]
         
+        # Base taxonomy components
         name_parts = [
             "2026",
             c_code,
@@ -140,14 +142,19 @@ if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=T
             clean_val(dur)
         ]
         
+        # Add the custom suffix if provided
+        creative_name = "_".join(name_parts)
+        if custom_suffix:
+            creative_name += f"_{clean_val(custom_suffix)}"
+        
         flat_data.append({
             "FUNNEL": f, "MESSAGING": m, "REGION": r, "LANGUAGE": l, "DURATION": dur,
-            "SizeLabel": siz, "Creative Name": "_".join(name_parts)
+            "SizeLabel": siz, "Creative Name": creative_name
         })
 
     if flat_data:
         df = pd.DataFrame(flat_data)
-        # Pivot into Spreadsheet format
+        # Pivot into Spreadsheet format matching the sample screenshot
         pivot_df = df.pivot_table(
             index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"],
             columns="SizeLabel", values="Creative Name", aggfunc="first"
