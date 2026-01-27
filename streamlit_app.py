@@ -12,7 +12,7 @@ st.markdown("""
 <style>
     .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
     
-    /* FIX: Selection tags remain large and adapt to text width */
+    /* Selection tags are large and adapt to text width */
     div[data-baseweb="tag"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -30,12 +30,20 @@ st.markdown("""
     .stMultiSelect div[data-baseweb="select"] > div {
         min-height: 48px !important;
     }
+    
+    /* Standardize button size */
+    div.stButton > button {
+        width: auto !important;
+        padding-left: 30px !important;
+        padding-right: 30px !important;
+    }
+    
     .info-box { background-color: #f0f2f6; padding: 1rem; border-radius: 8px; border-left: 5px solid #FF4B4B; margin-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------
-# 2. Taxonomy Data (Sourced from Reference Images)
+# 2. Taxonomy Data
 # ------------------------
 CLIENT_CODES = {
     "RCP": "ROGERS CORPORATE BRAND",
@@ -72,7 +80,7 @@ st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', un
 left, right = st.columns([1.2, 2.8], gap="large")
 
 with left:
-    # --- SECTION 1: Matrix Type Intelligence ---
+    # --- SECTION 1: Matrix Type ---
     with st.container(border=True):
         st.markdown("### 🛠️ 1. Matrix Configuration")
         matrix_type = st.radio("Asset Matrix Type", ["Social", "Display"], horizontal=True)
@@ -113,23 +121,23 @@ with left:
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
         selected_sizes = st.multiselect("Sizes", options=sorted(list(set(suggested_sizes + ["16x9"]))), default=suggested_sizes)
         
-        # NEW: Field for custom free-form character suffix
-        custom_suffix = st.text_input("Custom Suffix (Optional)", placeholder="e.g. V1, Final, Alpha")
+        # Free form suffix to add at the end of the convention
+        custom_suffix = st.text_input("Custom Suffix (Free Form)", placeholder="e.g. V1, Final")
 
 # ------------------------
 # 4. Generation & Pivot Logic
 # ------------------------
-if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=True):
+# Button is now standard width
+if st.button("🚀 Generate Asset Matrix", type="primary"):
     messages = [m.strip() for m in msg_input.splitlines() if m.strip()]
     combos = itertools.product(funnels, messages, regions, langs, durations, selected_sizes)
     flat_data = []
 
     for f, m, r, l, dur, siz in combos:
-        # Build 2026 Taxonomy: Year_Client_Product_Lang_Campaign_Messaging_Size_Date_AddInfo
         full_campaign = f"{camp_title}-{f}-{r}-{l}"
         size_code = siz.split()[0]
         
-        # Base taxonomy components
+        # Core Taxonomy Parts
         name_parts = [
             "2026",
             c_code,
@@ -142,7 +150,7 @@ if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=T
             clean_val(dur)
         ]
         
-        # Add the custom suffix if provided
+        # Append Custom Suffix if present
         creative_name = "_".join(name_parts)
         if custom_suffix:
             creative_name += f"_{clean_val(custom_suffix)}"
@@ -154,7 +162,6 @@ if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=T
 
     if flat_data:
         df = pd.DataFrame(flat_data)
-        # Pivot into Spreadsheet format matching the sample screenshot
         pivot_df = df.pivot_table(
             index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"],
             columns="SizeLabel", values="Creative Name", aggfunc="first"
@@ -176,6 +183,6 @@ with right:
         st.dataframe(st.session_state.matrix_ready, use_container_width=True, hide_index=True)
         
         csv = st.session_state.matrix_ready.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Excel/CSV", data=csv, file_name=f"Badger_{matrix_type}_Matrix.csv", use_container_width=True)
+        st.download_button("📥 Download Final Sheet", data=csv, file_name=f"Asset_Matrix_{matrix_type}.csv")
     else:
-        st.info("Select your Matrix Configuration and click Generate.")
+        st.info("Adjust settings on the left and click Generate.")
