@@ -17,28 +17,23 @@ st.markdown("""
         background-color: #FF4B4B !important;
         color: white !important;
         border-radius: 6px !important;
-        padding: 6px 14px !important; /* Increased padding */
+        padding: 8px 16px !important; 
         height: auto !important;
-        min-width: 50px !important; /* Ensure a minimum width */
     }
     
     div[data-baseweb="tag"] span {
-        font-size: 1rem !important; /* Increased font size */
+        font-size: 1.1rem !important; 
         font-weight: 600 !important;
         white-space: nowrap !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
     }
 
-    /* Increase the height of the input box itself to accommodate larger tags */
     .stMultiSelect div[data-baseweb="select"] > div {
-        min-height: 45px !important;
+        min-height: 50px !important;
     }
 
     .stTextInput label, .stSelectbox label, .stMultiSelect label, .stDateInput label { 
         font-weight: 700; 
         font-size: 1rem; 
-        color: #31333F;
     }
     
     .info-box { background-color: #f0f2f6; padding: 1rem; border-radius: 8px; border-left: 5px solid #FF4B4B; margin-bottom: 1rem; }
@@ -46,7 +41,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------
-# 2. Reference Data (from Taxonomy Screenshots)
+# 2. Reference Data & Mappings
 # ------------------------
 LOB_CODES = {
     "Connected Home": {"client": "RHE", "product": "IGN"},
@@ -57,7 +52,13 @@ LOB_CODES = {
     "Shaw Direct": {"client": "RSH", "product": "CBL"},
 }
 
-PRODUCT_CODES = ["IGN", "WLS", "BRA", "RBK", "RCB", "CBL", "TSP", "FIN", "SHM", "CWI", "FWI", "IDV", "RWI", "SOH", "FIB", "IOT"]
+# Platform to Size Mapping
+PLATFORM_SIZES = {
+    "Meta": ["1x1 Meta", "9x16 Story", "9x16 Reel"],
+    "Pinterest": ["2x3 Pinterest", "1x1 Pinterest", "9x16 Pinterest"],
+    "Reddit": ["1x1 Reddit", "4x5 Reddit", "16x9 Reddit"],
+    "Display (Standard)": ["300x250", "728x90", "160x600", "300x600", "970x250"],
+}
 
 def fmt_date(d: date) -> str:
     """Format: MMM.dd.yyyy (e.g., Jun.27.2025)"""
@@ -65,66 +66,81 @@ def fmt_date(d: date) -> str:
     return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
 
 def clean_val(s: str) -> str:
-    """Strictly remove underscores for taxonomy compliance"""
     return (s or "").replace("_", " ").strip()
 
 # ------------------------
-# 3. Input Panel
+# 3. Sidebar / Input Panel
 # ------------------------
 st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', unsafe_allow_html=True)
 
 left, right = st.columns([1.2, 2.8], gap="large")
 
 with left:
+    # --- 1. Matrix Type & Intelligence ---
     with st.container(border=True):
-        st.markdown("### 📋 1. Identity")
+        st.markdown("### 🛠️ 1. Matrix Configuration")
+        matrix_type = st.radio("Asset Matrix Type", ["Social", "Display"], horizontal=True)
+        
+        selected_platforms = []
+        default_sizes = []
+        
+        if matrix_type == "Social":
+            selected_platforms = st.multiselect("Platforms", list(PLATFORM_SIZES.keys())[:-1], default=["Meta", "Pinterest"])
+            for p in selected_platforms:
+                default_sizes.extend(PLATFORM_SIZES[p])
+        else:
+            default_sizes = PLATFORM_SIZES["Display (Standard)"]
+
+    # --- 2. Identity ---
+    with st.container(border=True):
+        st.markdown("### 📋 2. Identity")
         lob = st.selectbox("Line of Business", options=list(LOB_CODES.keys()), index=0)
         
         c1, c2 = st.columns(2)
         client_code = c1.text_input("Client Code", value=LOB_CODES[lob]["client"])
-        product_code = c2.selectbox("Product Code", options=PRODUCT_CODES, index=PRODUCT_CODES.index(LOB_CODES[lob]["product"]))
+        product_code = c2.text_input("Product Code", value=LOB_CODES[lob]["product"])
         
         d1, d2 = st.columns(2)
         start_date = d1.date_input("Start Date", value=date.today())
         end_date = d2.date_input("End Date", value=date(2026, 3, 31))
-        
-        delivery_date = st.date_input("Delivery Date", value=date.today())
 
+    # --- 3. Campaign Builder ---
     with st.container(border=True):
-        st.markdown("### 🏗️ 2. Campaign Builder")
-        camp_title = st.text_input("Campaign Title (Free Form)", value="Q3 Comwave QC")
+        st.markdown("### 🏗️ 3. Campaign Builder")
+        camp_title = st.text_input("Campaign Title (No Underscores)", value="Q3 Comwave QC")
         
-        # Tags here will be large and visible
         funnels = st.multiselect("Funnel", ["COS", "AWR", "COV", "D3B", "D3Y", "PNX"], default=["COS"])
         regions = st.multiselect("Region", ["ATL", "ROC", "QC", "Halifax"], default=["ATL"])
         langs = st.multiselect("Language", ["EN", "FR"], default=["EN"])
         
         msg_input = st.text_area("Messaging (one per line)", value="Internet Offer V1")
 
+    # --- 4. Asset Specs (Pre-filled based on Section 1) ---
     with st.container(border=True):
-        st.markdown("### 🎨 3. Asset Specs")
+        st.markdown("### 🎨 4. Asset Specs")
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
         
-        sheet_sizes = ["1x1 Meta", "2x3 Pinterest", "9x16 Story", "9x16 Reel"]
-        selected_sizes = st.multiselect("Sizes", sheet_sizes + ["16x9", "300x250"], default=sheet_sizes)
-        extension = st.selectbox("Extension", [".zip", ".mp4", ".jpg", ".html"], index=0)
+        # This list updates dynamically based on the "Matrix Configuration" above
+        final_sizes = st.multiselect("Sizes", options=sorted(list(set(default_sizes + ["16x9", "300x250"]))), default=default_sizes)
+        
+        extension = st.selectbox("Extension", [".zip", ".mp4", ".jpg", ".html"], index=0 if matrix_type == "Social" else 3)
 
 # ------------------------
-# 4. Pivot Generation
+# 4. Processing Logic
 # ------------------------
-if st.button("🚀 Generate Final Matrix", type="primary", use_container_width=True):
+if st.button("🚀 Generate Asset Matrix", type="primary", use_container_width=True):
     messages = [m.strip() for m in msg_input.splitlines() if m.strip()]
-    combos = itertools.product(funnels, messages, regions, langs, durations, selected_sizes)
+    combos = itertools.product(funnels, messages, regions, langs, durations, final_sizes)
     raw_rows = []
 
     for f, m, r, l, dur, siz in combos:
         full_camp = f"{camp_title}-{f}-{r}-{l}"
         add_info = f"{dur}{extension}"
-        dim = siz.split()[0] # e.g., '1x1'
+        dim = siz.split()[0] 
 
-        # Year_Client_Prod_Lang_Camp_Msg_Size_Date_AddInfo
+        # 9-Part Taxonomy: Year_Client_Prod_Lang_Camp_Msg_Size_Date_AddInfo
         parts = [
-            str(start_date.year),
+            "2026",
             client_code.strip(),
             product_code.strip(),
             l,
@@ -147,7 +163,6 @@ if st.button("🚀 Generate Final Matrix", type="primary", use_container_width=T
             columns="SizeHeader", values="Convention", aggfunc="first"
         ).reset_index()
 
-        pivot_df["DELIVERY DATE"] = fmt_date(delivery_date)
         pivot_df["START DATE"] = fmt_date(start_date)
         pivot_df["END DATE"] = fmt_date(end_date)
         pivot_df["URL"] = "https://www.rogers.com"
@@ -155,14 +170,14 @@ if st.button("🚀 Generate Final Matrix", type="primary", use_container_width=T
         st.session_state.final_matrix = pivot_df
 
 # ------------------------
-# 5. Result Display
+# 5. Output
 # ------------------------
 with right:
     if "final_matrix" in st.session_state:
-        st.markdown(f'<div class="info-box">Generated **{len(st.session_state.final_matrix)}** row variations.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-box">Matrix built for **{matrix_type}**. Export ready.</div>', unsafe_allow_html=True)
         st.dataframe(st.session_state.final_matrix, use_container_width=True, hide_index=True)
         
         csv_data = st.session_state.final_matrix.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Asset Matrix (CSV)", data=csv_data, file_name=f"Asset_Matrix_{date.today()}.csv", use_container_width=True)
+        st.download_button("📥 Download Final Sheet", data=csv_data, file_name="Badger_Matrix.csv", use_container_width=True)
     else:
-        st.info("Fill out the parameters and click Generate.")
+        st.info("Configure your matrix type on the left to begin.")
