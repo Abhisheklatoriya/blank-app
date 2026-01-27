@@ -22,15 +22,18 @@ st.markdown("""
 MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 def fmt_date(d: date) -> str:
-    """Format: MMM.DD.YYYY (e.g., Jan.27.2026)"""
+    """Format: MMM.DD.YYYY (e.g., Jun.27.2025)"""
     return f"{MONTHS[d.month-1]}.{d.day:02d}.{d.year}"
 
 def clean_val(s: str) -> str:
-    """Enforces 'No Underscore' rule by replacing with spaces."""
+    """Enforces 'No Underscore' rule per updated taxonomy."""
     return (s or "").replace("_", " ").strip()
 
 def build_name(year, client, product, lang, campaign, messaging, size, start_date, add_info, delimiter="_"):
-    """Matches the 9-part underscore taxonomy from the 2026 update."""
+    """
+    Constructs the name based on the 2026 Hierarchy:
+    Year_Client_Product_Language_CampaignName_Messaging_Size_Date_AdditionalInfo
+    """
     parts = [
         str(year).strip(),
         client.strip(),
@@ -55,7 +58,7 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
     rows = []
     current_year = date.today().year 
     for camp, msg, lang, dur, size in combos:
-        # Combine Duration with optional extension for 'Additional Info' slot
+        # Per taxonomy: Additional Info contains Duration and File Extension (e.g., 10s.zip)
         info = f"{dur}{config['extension']}"
         
         name = build_name(
@@ -74,7 +77,7 @@ def cartesian_generate(config: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 # ------------------------
-# 3. Updated Data Libraries
+# 3. Data Libraries & Corrected Options
 # ------------------------
 CLIENT_CODES = {
     "RCP": "ROGERS CORPORATE BRAND", "RHE": "CONNECTED HOME",
@@ -89,6 +92,12 @@ PRODUCT_CODES = {
     "SOH": "SOHO", "BRA": "BRAND", "INT": "INTERNET", "WLS": "WIRELESS",
     "FIB": "FIBRE", "IOT": "IOT", "CBL": "CABLE", "RBK": "ROGERS BANK"
 }
+
+# Master list of all possible sizes to avoid Streamlit error
+ALL_SIZES = [
+    "1x1", "9x16", "16x9", "9x16Story", "9x16Reel", "2x3", "4x5",
+    "300x250", "300x600", "728x90", "160x600", "970x250"
+]
 
 ASSET_MATRIX_PRESETS = {
     "Social": {"durations": ["6s", "15s"], "sizes": ["1x1", "9x16Story", "9x16Reel"]},
@@ -115,11 +124,13 @@ with left:
         st.markdown("### 🎨 Asset Strategy")
         matrix_type = st.selectbox("Matrix Type", options=list(ASSET_MATRIX_PRESETS.keys()))
         
+        # Get defaults based on selection
         default_dur = ASSET_MATRIX_PRESETS[matrix_type]["durations"]
         default_siz = ASSET_MATRIX_PRESETS[matrix_type]["sizes"]
         
-        durations = st.multiselect("Durations", ["Static", "6s", "15s", "30s", "60s"], default=default_dur)
-        sizes = st.multiselect("Sizes", ["1x1", "9x16", "16x9", "300x250", "300x600", "728x90"], default=default_siz)
+        durations = st.multiselect("Durations", ["Static", "6s", "10s", "15s", "30s", "60s"], default=default_dur)
+        # Use master list ALL_SIZES to prevent "default value not in options" error
+        sizes = st.multiselect("Sizes", ALL_SIZES, default=default_siz)
         extension = st.selectbox("File Extension (Optional)", ["", ".zip", ".mp4", ".jpg"], index=1)
 
     with st.container(border=True):
@@ -139,8 +150,9 @@ config = {
 }
 
 with right:
+    # --- OUTPUT SECTION ---
     total = len(c_names) * len(m_names) * len(languages) * len(durations) * len(sizes)
-    st.markdown(f'<div class="info-box">Generating <strong>{total:,}</strong> names based on 2026 Taxonomy.</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="info-box">Generating <strong>{total:,}</strong> creative names.</div>', unsafe_allow_html=True)
     
     if st.button("Generate Matrix", type="primary", use_container_width=True):
         df = cartesian_generate(config)
