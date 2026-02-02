@@ -1,5 +1,5 @@
 import streamlit as st
-import pd
+import pandas as pd
 from datetime import date
 import itertools
 
@@ -41,7 +41,7 @@ st.markdown("""
 # ------------------------
 # 2. Reference Data (LOB, Client, Product)
 # ------------------------
-# Mappings sourced from taxonomy reference image
+# Mappings sourced from your taxonomy reference
 LOB_DATA = {
     "Connected Home": {"client": "RHE", "product": "IGN"},
     "Consumer Wireless": {"client": "RCS", "product": "WLS"},
@@ -51,6 +51,7 @@ LOB_DATA = {
     "Shaw Direct": {"client": "RSH", "product": "CBL"},
 }
 
+# Full product list from your documentation
 PRODUCT_LIST = ["IGN", "WLS", "BRA", "RBK", "RCB", "CBL", "TSP", "FIN", "SHM", "CWI", "FWI", "IDV", "RWI", "SOH", "FIB", "IOT"]
 
 PLATFORM_SIZES = {
@@ -90,7 +91,7 @@ with left:
         else:
             suggested_sizes = PLATFORM_SIZES["Display"]
 
-    # --- SECTION 2: Identity (LOB Intelligence Restored) ---
+    # --- SECTION 2: Identity ---
     with st.container(border=True):
         st.markdown("### 📋 2. Identity")
         # Restored LOB Selector
@@ -136,7 +137,7 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
         full_campaign = f"{camp_title}-{f}-{r}-{l}"
         size_code = siz.split()[0]
         
-        # Taxonomy Construction
+        # Taxonomy Construction based on 2026 Rules
         name_parts = [
             "2026",
             client_code,
@@ -181,7 +182,6 @@ with right:
         st.markdown(f"### 📊 Generated {matrix_type} Matrix")
         st.caption("Editable: Click cells to adjust names or paste URLs before downloading.")
         
-        # Display editable table
         edited_df = st.data_editor(
             st.session_state.matrix_df, 
             use_container_width=True, 
@@ -197,4 +197,4 @@ with right:
             mime='text/csv'
         )
     else:
-        st.info("Fill out the identity and campaign sections to generate your matrix.")
+        st.info("Configure the sections on the left and click Generate.")
