@@ -2,26 +2,47 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 import itertools
-from groq import Groq
-import json
 
-# 1. PAGE SETUP
-st.set_page_config(page_title="Badger AI | Smart Matrix", page_icon="🦡", layout="wide")
+# ------------------------
+# 1. Page Configuration & Professional Styling
+# ------------------------
+st.set_page_config(page_title="Badger | Asset Matrix", page_icon="🦡", layout="wide")
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; }
-    .stChatMessage { border-radius: 12px; background-color: #f9f9f9; }
+    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
+    
+    /* Selection tags remain large and adapt to text width */
+    div[data-baseweb="tag"] {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border-radius: 4px !important;
+        padding: 6px 12px !important;
+        height: auto !important;
+        max-width: fit-content !important;
+    }
+    div[data-baseweb="tag"] span {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+    }
+    .stMultiSelect div[data-baseweb="select"] > div {
+        min-height: 48px !important;
+    }
+    
+    /* Standard button sizing (not full width) */
+    div.stButton > button {
+        width: auto !important;
+        padding-left: 30px !important;
+        padding-right: 30px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CLIENT SETUP (Using your key)
-# We use the key you provided earlier
-client = Groq(api_key="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")
-
-# 3. KNOWLEDGE BASE (The "Brain")
-# We define this here so we can inject it into the AI's prompts later
-LOB_KNOWLEDGE = {
+# ------------------------
+# 2. Reference Data (LOB, Client, Product)
+# ------------------------
+# Mappings sourced from your taxonomy reference
+LOB_DATA = {
     "Connected Home": {"client": "RHE", "product": "IGN"},
     "Consumer Wireless": {"client": "RCS", "product": "WLS"},
     "Rogers Business": {"client": "RNS", "product": "BRA"},
@@ -30,6 +51,9 @@ LOB_KNOWLEDGE = {
     "Shaw Direct": {"client": "RSH", "product": "CBL"},
 }
 
+# Full product list from your documentation
+PRODUCT_LIST = ["IGN", "WLS", "BRA", "RBK", "RCB", "CBL", "TSP", "FIN", "SHM", "CWI", "FWI", "IDV", "RWI", "SOH", "FIB", "IOT"]
+
 PLATFORM_SIZES = {
     "Meta": ["1x1 Meta", "9x16 Story", "9x16 Reel"],
     "Pinterest": ["2x3 Pinterest", "1x1 Pinterest", "9x16 Pinterest"],
@@ -37,136 +61,140 @@ PLATFORM_SIZES = {
     "Display": ["300x250", "728x90", "160x600", "300x600", "970x250"]
 }
 
-# 4. HELPER: PYTHON TABLE BUILDER
-def build_matrix_from_json(data):
-    """Takes the AI's JSON output and converts it to a Pandas DataFrame."""
-    try:
-        lob = data.get("lob", "Connected Home")
-        client_code = LOB_KNOWLEDGE.get(lob, {}).get("client", "ROG")
-        prod_code = LOB_KNOWLEDGE.get(lob, {}).get("product", "GEN")
+def fmt_date(d: date) -> str:
+    """Format: XXXdd.yyyy (e.g., Jun.27.2025)"""
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
+
+def clean_val(s: str) -> str:
+    """Taxonomy Rule: No Underscores Allowed in free-form segments"""
+    return (s or "").replace("_", " ").strip()
+
+# ------------------------
+# 3. Sidebar / Input Panel
+# ------------------------
+st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', unsafe_allow_html=True)
+
+left, right = st.columns([1.2, 2.8], gap="large")
+
+with left:
+    # --- SECTION 1: Matrix Type ---
+    with st.container(border=True):
+        st.markdown("### 🛠️ 1. Matrix Configuration")
+        matrix_type = st.radio("Asset Matrix Type", ["Social", "Display"], horizontal=True)
         
-        # Determine sizes
-        sizes = []
-        if data.get("matrix_type", "Social") == "Social":
-            for p in data.get("platforms", ["Meta"]):
-                sizes.extend(PLATFORM_SIZES.get(p, []))
+        suggested_sizes = []
+        if matrix_type == "Social":
+            platforms = st.multiselect("Platforms", ["Meta", "Pinterest", "Reddit"], default=["Meta", "Pinterest"])
+            for p in platforms:
+                suggested_sizes.extend(PLATFORM_SIZES[p])
         else:
-            sizes = PLATFORM_SIZES["Display"]
+            suggested_sizes = PLATFORM_SIZES["Display"]
 
-        # Generate rows
-        rows = []
-        today = date.today().strftime("%b.%d.%Y")
+    # --- SECTION 2: Identity ---
+    with st.container(border=True):
+        st.markdown("### 📋 2. Identity")
+        # Restored LOB Selector
+        lob_choice = st.selectbox("Line of Business", options=list(LOB_DATA.keys()), index=0)
         
-        combos = itertools.product(
-            data.get("funnels", ["COS"]),
-            data.get("messages", ["Offer_V1"]),
-            data.get("regions", ["ATL"]),
-            data.get("langs", ["EN"]),
-            data.get("durations", ["15s"]),
-            sizes
-        )
-
-        for f, m, r, l, dur, siz in combos:
-            camp_title = data.get("camp_title", "Campaign").replace(" ", "-")
-            size_code = siz.split()[0]
-            # The Naming Logic
-            name = f"2026_{client_code}_{prod_code}_{l}_{camp_title}-{f}-{r}_{m}_{size_code}_{today}_{dur}"
-            name = name.replace(" ", "") # Clean spaces
-            
-            rows.append({
-                "FUNNEL": f, "MESSAGING": m, "REGION": r, "LANGUAGE": l, 
-                "DURATION": dur, "Size": siz, "Creative Name": name
-            })
-
-        return pd.DataFrame(rows)
-    except Exception as e:
-        return pd.DataFrame()
-
-# 5. UI & CHAT LOGIC
-st.markdown('<div class="main-header">🦡 Badger AI</div>', unsafe_allow_html=True)
-st.caption("Powered by Groq Llama 3.3")
-
-chat_col, table_col = st.columns([1, 1.5], gap="large")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hello! I'm Badger. I know the taxonomy for Connected Home, Wireless, Bank, and more. What do you need?"}]
-
-with chat_col:
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]): st.write(msg["content"])
-
-    if prompt := st.chat_input("Ex: Build a Meta Matrix for Rogers Bank, Fall Campaign..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.write(prompt)
-
-        # --- THE CORE AI LOGIC (Your Snippet Adapted) ---
+        # Pre-filled based on LOB choice
+        c1, c2 = st.columns(2)
+        client_code = c1.text_input("Client Code", value=LOB_DATA[lob_choice]["client"])
+        product_code = c2.selectbox("Product Code", options=PRODUCT_LIST, index=PRODUCT_LIST.index(LOB_DATA[lob_choice]["product"]))
         
-        # We inject the knowledge into the system prompt
-        system_instruction = f"""
-        You are an expert Asset Matrix builder.
-        You have this knowledge about Lines of Business (LOB): {json.dumps(LOB_KNOWLEDGE)}
+        d1, d2 = st.columns(2)
+        start_date = d1.date_input("Start Date", value=date.today())
+        end_date = d2.date_input("End Date", value=date(2026, 3, 31))
+        delivery_date = st.date_input("Delivery Date", value=date.today())
+
+    # --- SECTION 3: Campaign Builder ---
+    with st.container(border=True):
+        st.markdown("### 🏗️ 3. Campaign Builder")
+        camp_title = st.text_input("Campaign Title (Free Form)", value="Q3 Comwave QC")
         
-        Your Goal: Extract the user's intent into a JSON object.
-        Required JSON Keys: 
-        - lob (Must match one of the keys in the LOB knowledge exactly)
-        - matrix_type ("Social" or "Display")
-        - platforms (List, e.g. ["Meta", "Pinterest"])
-        - camp_title (String)
-        - funnels (List of strings)
-        - regions (List of strings)
-        - langs (List of strings)
-        - messages (List of strings)
-        - durations (List of strings)
+        funnels = st.multiselect("Funnel", ["COS", "AWR", "COV", "D3B", "D3Y", "PNX"], default=["COS"])
+        regions = st.multiselect("Region", ["ATL", "ROC", "QC", "Halifax"], default=["ATL"])
+        langs = st.multiselect("Language", ["EN", "FR"], default=["EN"])
         
-        If the user doesn't specify something, use smart defaults based on the context.
-        """
+        msg_input = st.text_area("Messaging (one per line)", value="Internet Offer V1")
 
-        try:
-            with st.spinner("Badger is thinking..."):
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile", # Swapped to valid Groq model
-                    messages=[
-                        {"role": "system", "content": system_instruction},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.1, # Keep it low for JSON precision
-                    response_format={"type": "json_object"}, # Force JSON output
-                    stop=None
-                )
-                
-                # Get the JSON string content
-                ai_content = completion.choices[0].message.content
-                
-                # Turn it into a Python Dictionary
-                extracted_data = json.loads(ai_content)
-                
-                # Generate the DataFrame using our Python Helper
-                df = build_matrix_from_json(extracted_data)
-                
-                if not df.empty:
-                    # Save to session state to display on the right
-                    pivot = df.pivot_table(
-                        index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"], 
-                        columns="Size", values="Creative Name", aggfunc="first"
-                    ).reset_index()
-                    pivot["URL"] = ""
-                    st.session_state.matrix_df = pivot
-                    
-                    response_msg = f"✅ I've generated the **{extracted_data['lob']}** matrix with **{len(df)}** assets. Check the right panel!"
-                else:
-                    response_msg = "I understood your request, but I couldn't match the LOB name. Please try again with the exact LOB name (e.g., 'Connected Home')."
+    # --- SECTION 4: Asset Specs ---
+    with st.container(border=True):
+        st.markdown("### 🎨 4. Asset Specs")
+        durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
+        selected_sizes = st.multiselect("Sizes", options=sorted(list(set(suggested_sizes + ["16x9"]))), default=suggested_sizes)
+        custom_suffix = st.text_input("Custom Suffix (Free Form)", placeholder="e.g. V1, Final")
 
-                st.session_state.messages.append({"role": "assistant", "content": response_msg})
-                st.rerun()
-                
-        except Exception as e:
-            st.error(f"Error: {e}")
+# ------------------------
+# 4. Processing & Pivot Logic
+# ------------------------
+if st.button("🚀 Generate Asset Matrix", type="primary"):
+    messages = [m.strip() for m in msg_input.splitlines() if m.strip()]
+    combos = itertools.product(funnels, messages, regions, langs, durations, selected_sizes)
+    flat_data = []
 
-with table_col:
+    for f, m, r, l, dur, siz in combos:
+        full_campaign = f"{camp_title}-{f}-{r}-{l}"
+        size_code = siz.split()[0]
+        
+        # Taxonomy Construction based on 2026 Rules
+        name_parts = [
+            "2026",
+            client_code,
+            product_code,
+            l,
+            clean_val(full_campaign),
+            clean_val(m),
+            size_code,
+            fmt_date(start_date),
+            clean_val(dur)
+        ]
+        
+        creative_name = "_".join(name_parts)
+        if custom_suffix:
+            creative_name += f"_{clean_val(custom_suffix)}"
+        
+        flat_data.append({
+            "FUNNEL": f, "MESSAGING": m, "REGION": r, "LANGUAGE": l, "DURATION": dur,
+            "SizeLabel": siz, "Creative Name": creative_name
+        })
+
+    if flat_data:
+        df = pd.DataFrame(flat_data)
+        pivot_df = df.pivot_table(
+            index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"],
+            columns="SizeLabel", values="Creative Name", aggfunc="first"
+        ).reset_index()
+
+        # Metadata Columns
+        pivot_df["DELIVERY DATE"] = fmt_date(delivery_date)
+        pivot_df["START DATE"] = fmt_date(start_date)
+        pivot_df["END DATE"] = fmt_date(end_date)
+        pivot_df["URL"] = "" 
+        
+        st.session_state.matrix_df = pivot_df
+
+# ------------------------
+# 5. Output with Editable Data Editor
+# ------------------------
+with right:
     if "matrix_df" in st.session_state:
-        st.subheader("📊 Live Matrix")
-        edited_df = st.data_editor(st.session_state.matrix_df, use_container_width=True, hide_index=True)
+        st.markdown(f"### 📊 Generated {matrix_type} Matrix")
+        st.caption("Editable: Click cells to adjust names or paste URLs before downloading.")
+        
+        edited_df = st.data_editor(
+            st.session_state.matrix_df, 
+            use_container_width=True, 
+            hide_index=True,
+            num_rows="dynamic"
+        )
+        
         csv = edited_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download CSV", data=csv, file_name="Badger_Matrix.csv", use_container_width=True)
+        st.download_button(
+            "📥 Download Final Sheet", 
+            data=csv, 
+            file_name=f"Asset_Matrix_{lob_choice}_{matrix_type}.csv",
+            mime='text/csv'
+        )
     else:
-        st.info("Chat with Badger to generate a matrix.")
+        st.info("Configure the sections on the left and click Generate.")
