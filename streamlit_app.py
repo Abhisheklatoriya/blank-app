@@ -2,22 +2,22 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 import itertools
-import google.generativeai as genai
-import time
+from groq import Groq
+import json
 
-# 1. SETUP & STYLING
-st.set_page_config(page_title="Badger AI (Free Tier)", page_icon="🦡", layout="wide")
+# 1. PAGE SETUP
+st.set_page_config(page_title="Badger Turbo | Groq AI", page_icon="🦡", layout="wide")
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; }
-    .stChatMessage { border-radius: 10px; border: 1px solid #e0e0e0; }
+    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 1rem; }
+    .stChatMessage { border-radius: 12px; border: 1px solid #f0f2f6; background-color: #fafafa; }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURE API (Using your key)
-API_KEY = "AIzaSyBbxigz5xivYy4ZbCZUH82qL7qqkRB9nI0" 
-genai.configure(api_key=API_KEY)
+# 2. CONFIGURE GROQ
+GROQ_API_KEY = "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"
+client = Groq(api_key=GROQ_API_KEY)
 
 # 3. KNOWLEDGE BASE
 LOB_DATA = {
@@ -36,91 +36,102 @@ PLATFORM_SIZES = {
     "Display": ["300x250", "728x90", "160x600", "300x600", "970x250"]
 }
 
-# 4. GENERATION FUNCTION
+# 4. THE MATRIX ENGINE
 def run_matrix_logic(params):
-    """The engine that builds the table once the AI extracts the data."""
-    try:
-        lob = params.get("lob", "Connected Home")
-        matrix_type = params.get("matrix_type", "Social")
-        platforms = params.get("platforms", ["Meta"])
-        
-        client = LOB_DATA.get(lob, {}).get("client", "ROG")
-        product = LOB_DATA.get(lob, {}).get("product", "GEN")
-        
-        sizes = []
-        if matrix_type == "Social":
-            for p in platforms: sizes.extend(PLATFORM_SIZES.get(p, []))
-        else:
-            sizes = PLATFORM_SIZES["Display"]
+    """Local Python logic to build the CSV data based on AI-extracted params."""
+    lob = params.get("lob", "Connected Home")
+    m_type = params.get("matrix_type", "Social")
+    platforms = params.get("platforms", ["Meta"])
+    title = params.get("camp_title", "Campaign")
+    
+    # Get LOB Codes
+    codes = LOB_DATA.get(lob, {"client": "ROG", "product": "GEN"})
+    
+    # Resolve Sizes
+    sizes = []
+    if m_type.lower() == "social":
+        for p in platforms: sizes.extend(PLATFORM_SIZES.get(p, []))
+    else:
+        sizes = PLATFORM_SIZES["Display"]
 
-        # Default fallback values for demo stability
-        f_list = params.get("funnels", ["COS"])
-        m_list = params.get("messages", ["Offer V1"])
-        r_list = params.get("regions", ["ATL"])
-        l_list = params.get("langs", ["EN"])
-        d_list = params.get("durations", ["15s"])
-        title = params.get("camp_title", "Campaign")
+    # Combinations
+    rows = []
+    today = date.today().strftime("%b.%d.%Y")
+    
+    # Loops based on AI parameters
+    for f, m, r, l, dur, siz in itertools.product(
+        params.get("funnels", ["COS"]),
+        params.get("messages", ["Offer V1"]),
+        params.get("regions", ["ATL"]),
+        params.get("langs", ["EN"]),
+        params.get("durations", ["15s"]),
+        sizes
+    ):
+        name = f"2026_{codes['client']}_{codes['product']}_{l}_{title}-{f}-{r}_{m}_{siz.split()[0]}_{today}_{dur}"
+        rows.append({
+            "FUNNEL": f, "MESSAGING": m, "REGION": r, "LANGUAGE": l, 
+            "DURATION": dur, "SizeLabel": siz, "Creative Name": name.replace(" ", "")
+        })
 
-        rows = []
-        today = date.today().strftime("%b.%d.%Y")
-        for f, m, r, l, dur, siz in itertools.product(f_list, m_list, r_list, l_list, d_list, sizes):
-            name = f"2026_{client}_{product}_{l}_{title}-{f}-{r}_{m}_{siz.split()[0]}_{today}_{dur}"
-            rows.append({"FUNNEL": f, "MESSAGING": m, "REGION": r, "LANGUAGE": l, "DURATION": dur, "Size": siz, "Creative Name": name})
-
-        df = pd.DataFrame(rows)
-        pivot = df.pivot_table(index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"], columns="Size", values="Creative Name", aggfunc="first").reset_index()
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        pivot = df.pivot_table(index=["FUNNEL", "MESSAGING", "REGION", "LANGUAGE", "DURATION"], 
+                               columns="SizeLabel", values="Creative Name", aggfunc="first").reset_index()
         pivot["URL"] = ""
         st.session_state.matrix_data = pivot
         return True
-    except:
-        return False
+    return False
 
-# 5. UI LAYOUT
-st.title("🦡 Badger AI (Free Edition)")
+# 5. UI & CHAT LOGIC
+st.markdown('<div class="main-header">🦡 Badger Turbo (Groq-Powered)</div>', unsafe_allow_html=True)
+
 chat_col, table_col = st.columns([1, 1.8], gap="large")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I'm Badger. Tell me your LOB and campaign details, and I'll generate the matrix!"}]
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [{"role": "assistant", "content": "Badger here. Ready to build. What LOB are we focusing on?"}]
 
 with chat_col:
-    for msg in st.session_state.messages:
+    for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]): st.write(msg["content"])
 
-    if prompt := st.chat_input("Ex: Connected Home, Social (Meta), Q3 Promo..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("Ex: Build a Meta social matrix for Rogers Business, title 'Spring Biz'..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
 
-        # LIGHTWEIGHT CALL (Gemini 1.5 Flash is the cheapest/fastest)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # System instructions to extract data as JSON
-        sys_prompt = f"""
-        Extract marketing details from the user's request. 
-        Return ONLY a JSON object with these keys: 
-        lob, matrix_type, platforms (list), camp_title, funnels (list), regions (list), langs (list), messages (list), durations (list).
-        If information is missing, use reasonable defaults.
-        User said: {prompt}
+        # AI EXTRACTION CALL
+        sys_msg = f"""
+        Extract marketing parameters from: "{prompt}". 
+        Available LOBs: {list(LOB_DATA.keys())}.
+        Return a JSON object ONLY with: 
+        lob, matrix_type (Social/Display), platforms (list), camp_title, funnels (list), regions (list), langs (list), messages (list), durations (list).
+        Use defaults if missing.
         """
         
         try:
-            response = model.generate_content(sys_prompt)
-            # Find JSON in response and parse it
-            raw_text = response.text.strip().replace("```json", "").replace("```", "")
-            data_params = pd.read_json(raw_text, typ='series').to_dict()
+            # We use Llama 3.3 for high-speed reasoning
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "system", "content": sys_msg}],
+                response_format={"type": "json_object"}
+            )
             
-            if run_matrix_logic(data_params):
-                msg = "Matrix generated! Check the preview. Anything you want to change?"
+            extracted_data = json.loads(completion.choices[0].message.content)
+            
+            if run_matrix_logic(extracted_data):
+                bot_res = f"⚡ Matrix generated for **{extracted_data['lob']}**! Check the table."
             else:
-                msg = "I understood you, but couldn't build the table. Try being more specific!"
-                
-            st.session_state.messages.append({"role": "assistant", "content": msg})
-            with st.chat_message("assistant"): st.write(msg)
+                bot_res = "I understood the request, but couldn't generate the rows. Try adding more detail."
             
+            st.session_state.chat_history.append({"role": "assistant", "content": bot_res})
+            st.rerun()
+
         except Exception as e:
-            st.warning("Whoops, API is busy. Wait 10 seconds and try again!")
+            st.error(f"Groq is checking its cooling vents. Error: {str(e)}")
 
 with table_col:
     if "matrix_data" in st.session_state:
         st.subheader("📊 Live Asset Matrix")
         edited = st.data_editor(st.session_state.matrix_data, use_container_width=True, hide_index=True)
-        st.download_button("📥 Download CSV", data=edited.to_csv(index=False).encode('utf-8'), file_name="Badger_Matrix.csv")
+        st.download_button("📥 Download Final CSV", data=edited.to_csv(index=False).encode('utf-8'), file_name="Badger_Turbo_Matrix.csv")
+    else:
+        st.info("Your asset matrix will appear here once Badger processes your request.")
