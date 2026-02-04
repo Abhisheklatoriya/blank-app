@@ -6,7 +6,7 @@ import itertools
 # ------------------------
 # 1. Page Configuration & Professional Styling
 # ------------------------
-st.set_page_config(page_title="Badger | Asset Matrix", page_icon="🦡", layout="wide")
+st.set_page_config(page_title="Badger | Asset Matrix Creator", page_icon="🦡", layout="wide")
 
 st.markdown("""
 <style>
