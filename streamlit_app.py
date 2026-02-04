@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pd
 from datetime import date
 import itertools
 
@@ -41,7 +41,6 @@ st.markdown("""
 # ------------------------
 # 2. Reference Data (LOB, Client, Product)
 # ------------------------
-# Mappings sourced from your taxonomy reference
 LOB_DATA = {
     "Connected Home": {"client": "RHE", "product": "IGN"},
     "Consumer Wireless": {"client": "RCS", "product": "WLS"},
@@ -51,7 +50,6 @@ LOB_DATA = {
     "Shaw Direct": {"client": "RSH", "product": "CBL"},
 }
 
-# Full product list from your documentation
 PRODUCT_LIST = ["IGN", "WLS", "BRA", "RBK", "RCB", "CBL", "TSP", "FIN", "SHM", "CWI", "FWI", "IDV", "RWI", "SOH", "FIB", "IOT"]
 
 PLATFORM_SIZES = {
@@ -62,23 +60,20 @@ PLATFORM_SIZES = {
 }
 
 def fmt_date(d: date) -> str:
-    """Format: XXXdd.yyyy (e.g., Jun.27.2025)"""
     months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
     return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
 
 def clean_val(s: str) -> str:
-    """Taxonomy Rule: No Underscores Allowed in free-form segments"""
     return (s or "").replace("_", " ").strip()
 
 # ------------------------
 # 3. Sidebar / Input Panel
 # ------------------------
-st.markdown('<div class="main-header">🦡 Badger | 2026 Asset Matrix</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🦡 Badger | Asset Matrix Creator</div>', unsafe_allow_html=True)
 
 left, right = st.columns([1.2, 2.8], gap="large")
 
 with left:
-    # --- SECTION 1: Matrix Type ---
     with st.container(border=True):
         st.markdown("### 🛠️ 1. Matrix Configuration")
         matrix_type = st.radio("Asset Matrix Type", ["Social", "Display"], horizontal=True)
@@ -91,13 +86,10 @@ with left:
         else:
             suggested_sizes = PLATFORM_SIZES["Display"]
 
-    # --- SECTION 2: Identity ---
     with st.container(border=True):
         st.markdown("### 📋 2. Identity")
-        # Restored LOB Selector
         lob_choice = st.selectbox("Line of Business", options=list(LOB_DATA.keys()), index=0)
         
-        # Pre-filled based on LOB choice
         c1, c2 = st.columns(2)
         client_code = c1.text_input("Client Code", value=LOB_DATA[lob_choice]["client"])
         product_code = c2.selectbox("Product Code", options=PRODUCT_LIST, index=PRODUCT_LIST.index(LOB_DATA[lob_choice]["product"]))
@@ -107,18 +99,14 @@ with left:
         end_date = d2.date_input("End Date", value=date(2026, 3, 31))
         delivery_date = st.date_input("Delivery Date", value=date.today())
 
-    # --- SECTION 3: Campaign Builder ---
     with st.container(border=True):
         st.markdown("### 🏗️ 3. Campaign Builder")
         camp_title = st.text_input("Campaign Title (Free Form)", value="Q3 Comwave QC")
-        
         funnels = st.multiselect("Funnel", ["COS", "AWR", "COV", "D3B", "D3Y", "PNX"], default=["COS"])
         regions = st.multiselect("Region", ["ATL", "ROC", "QC", "Halifax"], default=["ATL"])
         langs = st.multiselect("Language", ["EN", "FR"], default=["EN"])
-        
         msg_input = st.text_area("Messaging (one per line)", value="Internet Offer V1")
 
-    # --- SECTION 4: Asset Specs ---
     with st.container(border=True):
         st.markdown("### 🎨 4. Asset Specs")
         durations = st.multiselect("Durations", ["6s", "10s", "15s", "30s", "Static"], default=["15s"])
@@ -137,17 +125,10 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
         full_campaign = f"{camp_title}-{f}-{r}-{l}"
         size_code = siz.split()[0]
         
-        # Taxonomy Construction based on 2026 Rules
         name_parts = [
-            "2026",
-            client_code,
-            product_code,
-            l,
-            clean_val(full_campaign),
-            clean_val(m),
-            size_code,
-            fmt_date(start_date),
-            clean_val(dur)
+            "2026", client_code, product_code, l,
+            clean_val(full_campaign), clean_val(m),
+            size_code, fmt_date(start_date), clean_val(dur)
         ]
         
         creative_name = "_".join(name_parts)
@@ -166,7 +147,6 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
             columns="SizeLabel", values="Creative Name", aggfunc="first"
         ).reset_index()
 
-        # Metadata Columns
         pivot_df["DELIVERY DATE"] = fmt_date(delivery_date)
         pivot_df["START DATE"] = fmt_date(start_date)
         pivot_df["END DATE"] = fmt_date(end_date)
@@ -175,7 +155,7 @@ if st.button("🚀 Generate Asset Matrix", type="primary"):
         st.session_state.matrix_df = pivot_df
 
 # ------------------------
-# 5. Output with Editable Data Editor
+# 5. Output Section
 # ------------------------
 with right:
     if "matrix_df" in st.session_state:
@@ -189,12 +169,22 @@ with right:
             num_rows="dynamic"
         )
         
-        csv = edited_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Download Final Sheet", 
-            data=csv, 
-            file_name=f"Asset_Matrix_{lob_choice}_{matrix_type}.csv",
-            mime='text/csv'
-        )
+        col_dl, col_reset, col_spacer = st.columns([1.2, 1, 2])
+        
+        with col_dl:
+            csv = edited_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "📥 Download CSV", 
+                data=csv, 
+                file_name=f"Asset_Matrix_{lob_choice}_{matrix_type}.csv",
+                mime='text/csv',
+                use_container_width=True
+            )
+            
+        with col_reset:
+            if st.button("🗑️ Reset Matrix", use_container_width=True):
+                if "matrix_df" in st.session_state:
+                    del st.session_state.matrix_df
+                    st.rerun()
     else:
         st.info("Configure the sections on the left and click Generate.")
