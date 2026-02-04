@@ -1,7 +1,12 @@
 import streamlit as st
-import pd
+import pandas as pd  # <--- Fixed this line
 from datetime import date
 import itertools
+
+# ------------------------
+# 1. Page Configuration & Professional Styling
+# ------------------------
+st.set_page_config(page_title="Badger | Asset Matrix Creator", page_icon="🦡", layout="wide")
 
 # ------------------------
 # 1. Page Configuration & Professional Styling
