@@ -1,0 +1,391 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #f8f9fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    text-align: center;
+    padding: 2rem 1rem 1rem;
+    background: white;
+    border-bottom: 1px solid #eee;
+}
+
+.main-header {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #FF4B4B;
+    margin-bottom: 0.5rem;
+}
+
+.sub-header {
+    font-size: 1.1rem;
+    color: #666;
+}
+
+.container {
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    gap: 2rem;
+}
+
+.sidebar {
+    width: 380px;
+    flex-shrink: 0;
+}
+
+.content {
+    flex: 1;
+    min-width: 0;
+}
+
+.card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+    color: #333;
+}
+
+.caption {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+.label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+.input, .select, .textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.input:focus, .select:focus, .textarea:focus {
+    outline: none;
+    border-color: #FF4B4B;
+}
+
+.textarea {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.row {
+    display: flex;
+    gap: 1rem;
+}
+
+.col {
+    flex: 1;
+}
+
+.radio-group {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.radio-label, .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.radio-label input, .checkbox-label input {
+    accent-color: #FF4B4B;
+    width: 18px;
+    height: 18px;
+}
+
+.checkbox-group, .multi-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.info-box {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-top: 0.75rem;
+}
+
+.info-box.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.info-box.info {
+    background: #e7f3ff;
+    color: #0c5460;
+    border: 1px solid #b8daff;
+}
+
+.info-box.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.divider {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 1.5rem 0;
+}
+
+.metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #FF4B4B;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #FF4B4B;
+    color: white;
+    width: 100%;
+}
+
+.btn-primary:hover {
+    background: #e63939;
+}
+
+.btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+.welcome-box {
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+}
+
+.welcome-box h4 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.welcome-box ol {
+    color: #555;
+    padding-left: 1.5rem;
+}
+
+.welcome-box li {
+    margin-bottom: 0.5rem;
+}
+
+.metrics-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    flex: 1;
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.metric-card-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #FF4B4B;
+}
+
+.metric-card-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.table-container {
+    overflow-x: auto;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    margin: 1rem 0;
+}
+
+#matrixTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+#matrixTable th, #matrixTable td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+#matrixTable th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+    position: sticky;
+    top: 0;
+}
+
+#matrixTable tr:hover {
+    background: #fafafa;
+}
+
+#matrixTable td {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.button-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.button-row .btn {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0.75rem 2rem;
+}
+
+#resultPanel h2 {
+    margin-bottom: 1.5rem;
+    color: #333;
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    width: auto;
+}
+
+.input-small {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+    width: auto;
+}
+
+.add-custom-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.offer-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+}
+
+.offer-name {
+    flex: 2;
+}
+
+.offer-price {
+    flex: 1;
+    max-width: 120px;
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    line-height: 1;
+    min-width: 32px;
+}
+
+.btn-remove:hover {
+    background: #c82333;
+}
+
+.btn-add-offer {
+    margin-top: 0.5rem;
+    background: #28a745;
+    color: white;
+}
+
+.btn-add-offer:hover {
+    background: #218838;
+}
+
+@media (max-width: 900px) {
+    .container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+    }
+    
+    .metrics-row {
+        flex-wrap: wrap;
+    }
+    
+    .metric-card {
+        flex: 1 1 45%;
+    }
+}
