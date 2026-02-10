@@ -1,179 +1,277 @@
 import streamlit as st
-import pandas as pd
-from datetime import date
-import itertools
+import streamlit.components.v1 as components
 
-# ------------------------
-# 1. Page Configuration
-# ------------------------
 st.set_page_config(page_title="Badger | Asset Matrix Creator", page_icon="🦡", layout="wide")
+
+with open('styles.css', 'r') as f:
+    css = f.read()
+
+with open('script.js', 'r') as f:
+    js = f.read()
+
+html_content = f'''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>{css}</style>
+</head>
+<body>
+    <header>
+        <h1 class="main-header">🦡 Badger</h1>
+        <p class="sub-header">Asset Matrix Creator — Generate naming conventions in seconds</p>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <section class="card">
+                <h3>🛠️ Step 1: Choose Matrix Type</h3>
+                <p class="caption">Select the type of assets you're creating</p>
+                
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="matrixType" value="Social" checked>
+                        <span>Social</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="matrixType" value="Display">
+                        <span>Display</span>
+                    </label>
+                </div>
+                
+                <div id="platformsContainer">
+                    <label class="label">Platforms</label>
+                    <div class="checkbox-group" id="platforms">
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="Meta" checked>
+                            <span>Meta</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="Pinterest" checked>
+                            <span>Pinterest</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="Reddit">
+                            <span>Reddit</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="sizesInfo" class="info-box success"></div>
+            </section>
+
+            <section class="card">
+                <h3>📋 Step 2: Set Identity</h3>
+                <p class="caption">Define the business unit and timing</p>
+                
+                <label class="label">Line of Business</label>
+                <select id="lob" class="select">
+                    <option value="Connected Home">Connected Home</option>
+                    <option value="Consumer Wireless">Consumer Wireless</option>
+                    <option value="Rogers Business">Rogers Business</option>
+                    <option value="Rogers Bank">Rogers Bank</option>
+                    <option value="Corporate Brand">Corporate Brand</option>
+                    <option value="Shaw Direct">Shaw Direct</option>
+                </select>
+                
+                <div class="row">
+                    <div class="col">
+                        <label class="label">Client Code</label>
+                        <input type="text" id="clientCode" class="input" value="RHE">
+                    </div>
+                    <div class="col">
+                        <label class="label">Product Code</label>
+                        <select id="productCode" class="select">
+                            <option value="IGN" selected>IGN</option>
+                            <option value="WLS">WLS</option>
+                            <option value="BRA">BRA</option>
+                            <option value="RBK">RBK</option>
+                            <option value="RCB">RCB</option>
+                            <option value="CBL">CBL</option>
+                            <option value="TSP">TSP</option>
+                            <option value="FIN">FIN</option>
+                            <option value="SHM">SHM</option>
+                            <option value="CWI">CWI</option>
+                            <option value="FWI">FWI</option>
+                            <option value="IDV">IDV</option>
+                            <option value="RWI">RWI</option>
+                            <option value="SOH">SOH</option>
+                            <option value="FIB">FIB</option>
+                            <option value="IOT">IOT</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <p class="label" style="margin-top: 1rem;"><strong>Campaign Dates</strong></p>
+                <div class="row">
+                    <div class="col">
+                        <label class="label">Start Date</label>
+                        <input type="date" id="startDate" class="input">
+                    </div>
+                    <div class="col">
+                        <label class="label">End Date</label>
+                        <input type="date" id="endDate" class="input">
+                    </div>
+                </div>
+                <label class="label">Delivery Date</label>
+                <input type="date" id="deliveryDate" class="input">
+            </section>
+
+            <section class="card">
+                <h3>🏗️ Step 3: Build Campaign</h3>
+                <p class="caption">Configure your campaign details</p>
+                
+                <label class="label">Campaign Title</label>
+                <input type="text" id="campaignTitle" class="input" value="Q3 Comwave QC">
+                
+                <div class="row">
+                    <div class="col">
+                        <label class="label">Funnel Stage</label>
+                        <div class="multi-select" id="funnels">
+                            <label class="checkbox-label"><input type="checkbox" value="AWR" checked><span>AWR</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="COV"><span>COV</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="COS"><span>COS</span></label>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <label class="label">Region</label>
+                        <div class="multi-select" id="regions">
+                            <label class="checkbox-label"><input type="checkbox" value="ATL" checked><span>ATL</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="ROC"><span>ROC</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="QC"><span>QC</span></label>
+                            <label class="checkbox-label"><input type="checkbox" value="Halifax"><span>Halifax</span></label>
+                        </div>
+                    </div>
+                </div>
+                
+                <label class="label">Language</label>
+                <div class="multi-select" id="languages">
+                    <label class="checkbox-label"><input type="checkbox" value="EN" checked><span>EN</span></label>
+                    <label class="checkbox-label"><input type="checkbox" value="FR"><span>FR</span></label>
+                </div>
+                
+                <label class="label">Messaging Variants</label>
+                <div id="offersList">
+                    <div class="offer-row">
+                        <input type="text" class="input offer-name" placeholder="Offer name" value="Internet Offer V1">
+                        <input type="text" class="input offer-price" placeholder="Price (e.g. $65)">
+                        <button type="button" class="btn btn-small btn-remove" title="Remove">×</button>
+                    </div>
+                </div>
+                <button type="button" id="addOfferBtn" class="btn btn-small btn-add-offer">+ Add Offer</button>
+            </section>
+
+            <section class="card">
+                <h3>🎨 Step 4: Specify Assets</h3>
+                <p class="caption">Define durations and sizes</p>
+                
+                <label class="label">Durations</label>
+                <div class="multi-select" id="durations">
+                    <label class="checkbox-label"><input type="checkbox" value="6s"><span>6s</span></label>
+                    <label class="checkbox-label"><input type="checkbox" value="10s"><span>10s</span></label>
+                    <label class="checkbox-label"><input type="checkbox" value="15s" checked><span>15s</span></label>
+                    <label class="checkbox-label"><input type="checkbox" value="30s"><span>30s</span></label>
+                    <label class="checkbox-label"><input type="checkbox" value="Static"><span>Static</span></label>
+                </div>
+                <div class="add-custom-row">
+                    <input type="text" id="customDuration" class="input input-small" placeholder="e.g. 5s">
+                    <button type="button" id="addDurationBtn" class="btn btn-small">+ Add</button>
+                </div>
+                
+                <label class="label">Sizes</label>
+                <div class="multi-select" id="sizes"></div>
+                <div class="add-custom-row">
+                    <input type="text" id="customSize" class="input input-small" placeholder="e.g. 320x50">
+                    <button type="button" id="addSizeBtn" class="btn btn-small">+ Add</button>
+                </div>
+                
+                <label class="label">Custom Suffix (Optional)</label>
+                <input type="text" id="customSuffix" class="input" placeholder="e.g. V1, Final, Draft">
+            </section>
+
+            <div class="divider"></div>
+            
+            <div id="totalAssets" class="metric">
+                <span class="metric-label">📊 Total Assets</span>
+                <span class="metric-value">0</span>
+            </div>
+            <p id="assetBreakdown" class="caption"></p>
+            
+            <button id="generateBtn" class="btn btn-primary">🚀 Generate Asset Matrix</button>
+            
+            <div id="warningBox" class="info-box warning" style="display: none;">
+                ⚠️ Please select at least one option in each category
+            </div>
+        </aside>
+
+        <main class="content">
+            <div id="welcomePanel">
+                <h2>👋 Welcome!</h2>
+                <div class="welcome-box">
+                    <h4>How to use Badger:</h4>
+                    <ol>
+                        <li><strong>Choose Matrix Type</strong> — Social or Display</li>
+                        <li><strong>Set Identity</strong> — Select your business unit and dates</li>
+                        <li><strong>Build Campaign</strong> — Add funnel, regions, languages, and messaging</li>
+                        <li><strong>Specify Assets</strong> — Pick durations and sizes</li>
+                        <li><strong>Generate!</strong> — Click the button to create your matrix</li>
+                    </ol>
+                </div>
+                <div class="info-box info">
+                    👈 Configure the options on the left, then click <strong>Generate Asset Matrix</strong> to create your naming convention spreadsheet.
+                </div>
+            </div>
+            
+            <div id="resultPanel" style="display: none;">
+                <h2>📊 Your <span id="matrixTypeLabel">Social</span> Asset Matrix</h2>
+                
+                <div class="metrics-row">
+                    <div class="metric-card">
+                        <span class="metric-card-value" id="totalRows">0</span>
+                        <span class="metric-card-label">Total Rows</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-card-value" id="sizeColumns">0</span>
+                        <span class="metric-card-label">Size Columns</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-card-value">✓</span>
+                        <span class="metric-card-label">Ready to Export</span>
+                    </div>
+                </div>
+                
+                <p class="caption">💡 <strong>Tip:</strong> Review the table below. All data is ready for download.</p>
+                
+                <div class="table-container">
+                    <table id="matrixTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div class="button-row">
+                    <button id="copyBtn" class="btn btn-primary">📋 Copy to Clipboard</button>
+                    <button id="downloadBtn" class="btn btn-primary">📥 Download as CSV</button>
+                    <button id="clearBtn" class="btn btn-secondary">🗑️ Clear & Start Over</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>{js}</script>
+</body>
+</html>
+'''
 
 st.markdown("""
 <style>
-    .main-header { font-size: 2.2rem; font-weight: 700; color: #FF4B4B; margin-bottom: 0.5rem; }
-    div[data-baseweb="tag"] { background-color: #FF4B4B !important; color: white !important; }
-    .stButton > button { width: auto !important; padding-left: 30px !important; padding-right: 30px !important; }
+    .stApp > header { display: none; }
+    .block-container { padding: 0 !important; max-width: 100% !important; }
+    iframe { border: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------------
-# 2. Reference Data
-# ------------------------
-LOB_DATA = {
-    "Connected Home": {"client": "RHE", "product": "IGN"},
-    "Consumer Wireless": {"client": "RCS", "product": "WLS"},
-    "Rogers Business": {"client": "RNS", "product": "BRA"},
-    "Rogers Bank": {"client": "RBG", "product": "RBK"},
-    "Corporate Brand": {"client": "RCP", "product": "RCB"},
-    "Shaw Direct": {"client": "RSH", "product": "CBL"},
-}
-
-PRODUCT_LIST = ["IGN", "WLS", "BRA", "RBK", "RCB", "CBL", "TSP", "FIN", "SHM", "CWI", "FWI", "IDV", "RWI", "SOH", "FIB", "IOT"]
-
-PLATFORM_SIZES = {
-    "Meta": ["1x1 Meta", "9x16 Story", "9x16 Reel"],
-    "Pinterest": ["2x3 Pinterest", "1x1 Pinterest", "9x16 Pinterest"],
-    "Reddit": ["1x1 Reddit", "4x5 Reddit", "16x9 Reddit"],
-    "Display": ["300x250", "728x90", "160x600", "300x600", "970x250"]
-}
-
-def fmt_date(d: date) -> str:
-    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-    return f"{months[d.month-1]}.{d.day:02d}.{d.year}"
-
-def clean_val(s: str) -> str:
-    return str(s).replace("_", " ").strip()
-
-# ------------------------
-# 3. Input Panel
-# ------------------------
-st.markdown('<div class="main-header">🦡 Badger | Asset Matrix Creator</div>', unsafe_allow_html=True)
-
-left, right = st.columns([1.3, 2.7], gap="large")
-
-with left:
-    # 1. Configuration
-    with st.container(border=True):
-        st.markdown("### 🛠️ 1. Configuration")
-        matrix_type = st.radio("Type", ["Social", "Display"], horizontal=True)
-        
-        # SIZES: Presets + Custom
-        suggested = []
-        if matrix_type == "Social":
-            platforms = st.multiselect("Platforms", ["Meta", "Pinterest", "Reddit"], default=["Meta"])
-            for p in platforms: suggested.extend(PLATFORM_SIZES[p])
-        else:
-            suggested = PLATFORM_SIZES["Display"]
-        
-        selected_sizes = st.multiselect("Sizes", options=list(set(suggested)), default=suggested)
-        custom_size = st.text_input("Add Custom Size (e.g. 320x50)")
-        if custom_size: selected_sizes.append(custom_size)
-
-    # 2. Identity
-    with st.container(border=True):
-        st.markdown("### 📋 2. Identity")
-        lob_choice = st.selectbox("LOB", options=list(LOB_DATA.keys()))
-        c1, c2 = st.columns(2)
-        client_code = c1.text_input("Client", value=LOB_DATA[lob_choice]["client"])
-        product_code = c2.selectbox("Product", options=PRODUCT_LIST, index=PRODUCT_LIST.index(LOB_DATA[lob_choice]["product"]))
-        start_date = st.date_input("Start Date", value=date.today())
-
-    # 3. Campaign & Offers
-    with st.container(border=True):
-        st.markdown("### 🏗️ 3. Campaign & Offers")
-        camp_title = st.text_input("Campaign Title", value="Q3 Offer")
-        
-        # Simplified Funnels
-        funnels = st.multiselect("Funnel", ["AWR", "COV", "COS"], default=["COS"])
-        regions = st.multiselect("Region", ["ATL", "ROC", "QC", "Halifax"], default=["ROC", "QC"])
-        
-        st.write("**Messaging & Pricing**")
-        if 'offer_rows' not in st.session_state:
-            st.session_state.offer_rows = [{"msg": "Internet Offer", "price": ""}]
-        
-        def add_offer(): st.session_state.offer_rows.append({"msg": "", "price": ""})
-        
-        for i, row in enumerate(st.session_state.offer_rows):
-            r1, r2 = st.columns([2, 1])
-            st.session_state.offer_rows[i]["msg"] = r1.text_input(f"Msg {i+1}", value=row["msg"], key=f"m{i}")
-            st.session_state.offer_rows[i]["price"] = r2.text_input(f"Price {i+1}", value=row["price"], key=f"p{i}", placeholder="$65")
-        
-        st.button("➕ Add Offer", on_click=add_offer)
-
-    # 4. Durations
-    with st.container(border=True):
-        st.markdown("### 🎨 4. Asset Specs")
-        preset_durs = ["6s", "15s", "30s", "Static"]
-        selected_durs = st.multiselect("Durations", options=preset_durs, default=["15s"])
-        custom_dur = st.text_input("Add Custom Duration (e.g. 5s)")
-        if custom_dur: selected_durs.append(custom_dur)
-        custom_suffix = st.text_input("Custom Suffix")
-
-# ------------------------
-# 4. Conditional Logic Engine
-# ------------------------
-if st.button("🚀 Generate Asset Matrix", type="primary"):
-    flat_data = []
-    
-    # Nested loops to handle FR/QC logic
-    for f, r, dur, siz in itertools.product(funnels, regions, selected_durs, selected_sizes):
-        
-        # Logic: FR only for QC. Everyone else only gets EN.
-        langs = ["FR", "EN"] if r == "QC" else ["EN"]
-        
-        for l in langs:
-            for offer in st.session_state.offer_rows:
-                msg = clean_val(offer["msg"])
-                price = clean_val(offer["price"])
-                size_code = siz.split()[0]
-                
-                # Build Taxonomy
-                full_campaign = f"{camp_title}-{f}-{r}-{l}"
-                
-                name_parts = [
-                    "2026", client_code, product_code, l,
-                    clean_val(full_campaign), msg, size_code,
-                    fmt_date(start_date), clean_val(dur)
-                ]
-                
-                creative_name = "_".join(name_parts)
-                if price: creative_name += f"_{price}"
-                if custom_suffix: creative_name += f"_{clean_val(custom_suffix)}"
-                
-                flat_data.append({
-                    "FUNNEL": f, "REGION": r, "LANGUAGE": l, "MESSAGING": msg, "PRICE": price,
-                    "DURATION": dur, "SIZE": siz, "Creative Name": creative_name
-                })
-
-    if flat_data:
-        st.session_state.matrix_df = pd.DataFrame(flat_data)
-
-# ------------------------
-# 5. Output Section
-# ------------------------
-with right:
-    if "matrix_df" in st.session_state:
-        st.markdown("### 📊 Generated Matrix")
-        
-        edited_df = st.data_editor(st.session_state.matrix_df, use_container_width=True, hide_index=True)
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            csv = edited_df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download CSV", data=csv, file_name="Badger_Matrix.csv", use_container_width=True)
-            
-        with col2:
-            # Copy to Clipboard (Using st.dataframe workaround for web clipboard)
-            # In modern browsers, users can select all and copy from data_editor.
-            # To make it easier, we provide a markdown snippet.
-            if st.button("📋 Copy to Clipboard", use_container_width=True):
-                st.write("Selected data ready! Use `Ctrl+C` on the table above.")
-                st.toast("Table ready for copying!")
-
-        with col3:
-            if st.button("🗑️ Reset Matrix", use_container_width=True):
-                del st.session_state.matrix_df
-                st.rerun()
-    else:
-        st.info("Adjust settings on the left and click Generate.")
+components.html(html_content, height=1200, scrolling=True)
