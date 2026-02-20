@@ -9,7 +9,7 @@ st.set_page_config(page_title="Badger Tools Hub", page_icon="🦡", layout="wide
 APPS = {
     "🦡 Asset Matrix Creator": "streamlit_app.py",
     "📦 Smartly Asset Checker": "app.py",
-    "📁 Dynamic File Matcher": "FileMatcher.py" # Ensure this filename matches your 3rd app
+    "📁 File Matcher": "FileMatcher.py" # Ensure this filename matches your 3rd app
 }
 
 def run_app(file_path):
