@@ -39,7 +39,7 @@ if 'page' not in st.session_state:
 # Ensure these filenames match your GitHub exactly
 APPS = {
     "Asset Matrix Creator": {"file": "streamlit_app.py", "icon": "🦡", "desc": "Generate naming conventions and matrix files."},
-    "Ad & Creative Matcher": {"file": "AdMatcher.py", "icon": "📦", "desc": "Sync Word documents with Dropbox assets."},
+    "Ad & Creative Matcher": {"file": "AdMatcher.py", "icon": "📦", "desc": "sync Ad codes with Assets."},
     "File Matcher": {"file": "FileMatcher.py", "icon": "📁", "desc": "Bulk match and verify asset files."}
 }
 
