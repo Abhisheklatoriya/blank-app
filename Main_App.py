@@ -4,24 +4,29 @@ import os
 # --- 1. Global Page Config ---
 st.set_page_config(page_title="Badger Tools Hub", page_icon="🦡", layout="wide")
 
-# Custom CSS for the Home Page cards
+# Custom CSS for a clean, professional look and "App Cards"
 st.markdown("""
     <style>
-    .main { background-color: #f9f9f9; }
-    div.stButton > button {
-        width: 100%;
-        height: 150px;
-        font-size: 20px;
-        font-weight: bold;
+    /* Hide the default Streamlit sidebar and header for a cleaner look */
+    [data-testid="stSidebar"] {display: none;}
+    [data-testid="stHeader"] {display: none;}
+    
+    .main { background-color: #ffffff; }
+    
+    /* Card Styles */
+    .app-card {
+        border: 1px solid #e6e6e6;
+        padding: 20px;
         border-radius: 15px;
-        border: 1px solid #ddd;
-        transition: all 0.3s ease;
+        text-align: center;
+        background-color: #fcfcfc;
+        transition: 0.3s;
     }
-    div.stButton > button:hover {
-        border-color: #FF4B4B;
-        color: #FF4B4B;
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    
+    /* Button Styling */
+    div.stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -31,6 +36,7 @@ if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
 # --- 3. App Definitions ---
+# Ensure these filenames match your GitHub exactly
 APPS = {
     "Asset Matrix Creator": {"file": "streamlit_app.py", "icon": "🦡", "desc": "Generate naming conventions and matrix files."},
     "Ad & Creative Matcher": {"file": "AdMatcher.py", "icon": "📦", "desc": "Sync Word documents with Dropbox assets."},
@@ -43,46 +49,55 @@ def run_app(file_path):
         with open(file_path, "r", encoding="utf-8") as f:
             code = f.read()
             try:
-                # We use a clean globals dictionary to prevent apps from leaking into each other
+                # Use current globals so Streamlit functions work correctly
                 exec(code, globals())
             except st.errors.StreamlitAPIException as e:
                 if "set_page_config" in str(e):
-                    pass
+                    pass # Ignore if the sub-app has its own config
                 else:
                     raise e
     else:
-        st.error(f"File not found: {file_path}")
+        st.error(f"⚠️ File not found: {file_path}")
 
-# --- 4. TOP NAVIGATION BAR ---
-if st.session_state.page != 'home':
-    col1, col2 = st.columns([1, 8])
-    with col1:
-        if st.button("🏠 Home"):
+# --- 4. TOP NAVIGATION BAR (Always Visible) ---
+nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+
+with nav_col1:
+    if st.session_state.page != 'home':
+        if st.button("⬅️ Back to Home"):
             st.session_state.page = 'home'
             st.rerun()
-    with col2:
-        st.subheader(f"Running: {st.session_state.page}")
-    st.divider()
+
+with nav_col2:
+    if st.session_state.page == 'home':
+        st.markdown("<h2 style='text-align: center; margin-top:-10px;'>🦡 Badger Tools Hub</h2>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<h3 style='text-align: center; margin-top:-10px;'>Running: {st.session_state.page}</h3>", unsafe_allow_html=True)
+
+st.divider()
 
 # --- 5. PAGE LOGIC ---
 if st.session_state.page == 'home':
-    st.title("🦡 Badger Tools Hub")
-    st.write("Welcome! Select a tool below to get started.")
-    st.write("")
-
-    # Create 3 columns for the 3 apps
+    st.write("") # Padding
+    
+    # Create 3 columns for the Dashboard layout
     col1, col2, col3 = st.columns(3)
+    app_list = list(APPS.items())
 
-    cols = [col1, col2, col3]
-    for idx, (app_name, info) in enumerate(APPS.items()):
-        with cols[idx]:
-            st.markdown(f"### {info['icon']} {app_name}")
+    # Launch Buttons in Cards
+    for i, col in enumerate([col1, col2, col3]):
+        name, info = app_list[i]
+        with col:
+            st.markdown(f"<div class='app-card'>", unsafe_allow_html=True)
+            st.markdown(f"## {info['icon']}")
+            st.markdown(f"**{name}**")
             st.write(info['desc'])
-            if st.button(f"Launch {app_name}", key=app_name):
-                st.session_state.page = app_name
+            if st.button(f"Open {name}", key=f"launch_{i}"):
+                st.session_state.page = name
                 st.rerun()
+            st.markdown(f"</div>", unsafe_allow_html=True)
 
 else:
-    # Run the selected sub-app
+    # Get the file for the selected app and run it
     target_file = APPS[st.session_state.page]["file"]
     run_app(target_file)
