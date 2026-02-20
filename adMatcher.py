@@ -1,102 +1,115 @@
 import streamlit as st
-import pandas as pd
+import dropbox
+import re
+from docx import Document
 
-st.set_page_config(page_title="Dynamic File Matcher", layout="wide")
+# --- 1. SETUP ---
+try:
+    dbx = dropbox.Dropbox(st.secrets["dropbox"]["refresh_token"])
+except Exception as e:
+    st.error("🔑 Token Error: Please paste a fresh Dropbox token into your Secrets.")
+    st.stop()
 
-# --- Reset Logic ---
-def reset_app():
-    st.session_state["file_uploader_key"] += 1
-    st.session_state["data_editor_key"] += 1
+st.set_page_config(page_title="Ad Matcher: Parent Brands", layout="wide")
+st.title("🎯 Ad Matcher")
 
-if "file_uploader_key" not in st.session_state:
-    st.session_state["file_uploader_key"] = 0
-if "data_editor_key" not in st.session_state:
-    st.session_state["data_editor_key"] = 100
+uploaded_docx = st.file_uploader("📂 Upload Word Document (.docx)", type=["docx"])
 
-# --- Top Header & Controls ---
-top_col1, top_col2, top_col3 = st.columns([3, 2, 1])
+if uploaded_docx:
+    with st.spinner("🔍 Indexing Dropbox Assets..."):
+        try:
+            result = dbx.files_list_folder('', recursive=True)
+            all_files = result.entries
+            while result.has_more:
+                result = dbx.files_list_folder_continue(result.cursor)
+                all_files.extend(result.entries)
+        except Exception as e:
+            st.error(f"Dropbox Error: {e}")
+            st.stop()
 
-with top_col1:
-    st.title("📁 Dynamic File Matcher")
-
-with top_col2:
-    # Use a number input to let users expand or shrink columns
-    num_cols = st.number_input("Number of Columns to Paste", min_value=1, max_value=20, value=4)
-
-with top_col3:
-    st.write(" ") # Padding
-    if st.button("🔄 Reset All", use_container_width=True, on_click=reset_app):
-        st.rerun()
-
-st.write(f"Paste your {num_cols} columns of filenames below and upload your files.")
-
-# --- UI Layout ---
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    st.subheader("1. Upload Files")
-    uploaded_files = st.file_uploader(
-        "Upload files here", 
-        accept_multiple_files=True,
-        key=f"uploader_{st.session_state['file_uploader_key']}"
-    )
-    uploaded_names = set([f.name for f in uploaded_files]) if uploaded_files else set()
+    # --- 2. EXTRACT & MAP BRANDS ---
+    doc = Document(uploaded_docx)
+    full_text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+    chunks = re.split(r'(\b\d{8}\b)', full_text)
     
-    if uploaded_names:
-        st.success(f"✅ {len(uploaded_names)} files uploaded.")
-
-with col2:
-    st.subheader(f"2. Paste Expected Names ({num_cols} Columns)")
+    ad_data = []
     
-    # Dynamically create the column list based on user input
-    column_names = [f"Col {i+1}" for i in range(num_cols)]
+    # Mapping logic for your 5 required brands
+    def get_parent_brand(text):
+        text = text.lower()
+        if any(x in text for x in ["bell", "bce", "ctv"]): return "Bell"
+        if "telus" in text: return "Telus"
+        if "fizz" in text: return "Fizz"
+        if "videotron" in text or "quebecor" in text: return "Videotron"
+        if "freedom" in text: return "Freedom"
+        return "Other"
+
+    for i in range(1, len(chunks), 2):
+        code = chunks[i]
+        details = chunks[i+1] if i+1 < len(chunks) else ""
+        
+        # Determine Brand Category
+        brand_match = re.search(r'Brand[s]?:\s*(.*)', details)
+        original_brand = brand_match.group(1).strip() if brand_match else "Unknown"
+        parent_brand = get_parent_brand(original_brand)
+        
+        # Extract Media Outlet
+        media_match = re.search(r'Media Outlet:\s*(.*)', details)
+        media_name = media_match.group(1).strip() if media_match else "Unknown"
+        
+        ad_data.append({
+            "code": code,
+            "parent_brand": parent_brand,
+            "original_brand": original_brand,
+            "media": media_name,
+            "details": details.strip()
+        })
+
+    # --- 3. SIDEBAR FILTERS ---
+    st.sidebar.header("🔍 Filter Settings")
+    # Only show your 5 core brands
+    brand_filter = st.sidebar.selectbox("Select Parent Brand:", ["All", "Bell", "Telus", "Fizz", "Videotron", "Freedom"])
     
-    # Initialize the table with the dynamic number of columns
-    init_df = pd.DataFrame([["" for _ in range(num_cols)]] * 10, columns=column_names)
+    filtered_ads = [ad for ad in ad_data if brand_filter == "All" or ad['parent_brand'] == brand_filter]
     
-    pasted_df = st.data_editor(
-        init_df, 
-        num_rows="dynamic", 
-        use_container_width=True,
-        hide_index=True,
-        key=f"editor_{st.session_state['data_editor_key']}_{num_cols}" # Key changes if col count changes
-    )
+    st.divider()
+    st.subheader(f"Found {len(filtered_ads)} ads for {brand_filter}")
 
-st.divider()
+    # --- 4. DISPLAY RESULTS ---
+    for ad in filtered_ads:
+        code = ad['code']
+        with st.container(border=True):
+            col_text, col_media = st.columns([1, 1])
+            
+            with col_text:
+                st.markdown(f"### {ad['parent_brand']}")
+                st.caption(f"**Original Brand:** {ad['original_brand']} | **Outlet:** {ad['media']}")
+                st.info(ad['details'])
+                
+                # --- FALLBACK FOR COPY BUTTON ---
+                copy_content = f"Ad Code: {code}\n{ad['details']}"
+                if hasattr(st, "copy_button"):
+                    st.copy_button(label="📋 Copy Details", text=copy_content, key=f"btn_{code}")
+                else:
+                    st.text_area("Copy Details (Ctrl+C):", value=copy_content, height=100, key=f"area_{code}")
 
-# --- Process the comparison ---
-has_uploaded = len(uploaded_names) > 0
-has_pasted = not pasted_df.replace('', pd.NA).dropna(how='all').empty
-
-if not has_uploaded and not has_pasted:
-    st.info("Waiting for file uploads and pasted data...")
-else:
-    # Flatten all dynamic columns into a single list
-    raw_pasted_names = pasted_df.values.flatten()
-    expected_names = set([str(name).strip() for name in raw_pasted_names if str(name).strip()])
-
-    st.subheader("3. Match Analysis")
-    
-    missing = expected_names - uploaded_names
-    extra = uploaded_names - expected_names
-
-    if not missing and expected_names:
-        st.success("✨ All pasted filenames were found in the uploaded batch!")
-        if not extra:
-            st.balloons()
-    
-    res_a, res_b = st.columns(2)
-    
-    with res_a:
-        if missing:
-            st.error(f"❌ Missing Files ({len(missing)})")
-            for m in sorted(missing):
-                st.write(f"• `{m}`")
-        elif has_pasted:
-            st.success("✅ All listed files are present.")
-
-    with res_b:
-        if extra:
-            st.warning(f"➕ Extra Files ({len(extra)})")
-            for e in sorted(extra):
-                st.write(f"• `{e}`")
+            with col_media:
+                match = next((f for f in all_files if isinstance(f, dropbox.files.FileMetadata) and code in f.name), None)
+                if match:
+                    try:
+                        link = dbx.files_get_temporary_link(match.path_lower).link
+                        fname = match.name.lower()
+                        
+                        if fname.endswith(('.mp3', '.wav', '.m4a')):
+                            st.write("🎵 **Radio Audio Preview:**")
+                            st.audio(link)
+                        elif fname.endswith(('.mp4', '.mov')):
+                            st.video(link)
+                        else:
+                            st.image(link)
+                            
+                        st.link_button(f"📥 Download {code}", link)
+                    except:
+                        st.error("Error loading file.")
+                else:
+                    st.warning(f"⚠️ Code {code} not found in Dropbox.")
