@@ -8,7 +8,7 @@ st.set_page_config(page_title="Badger Tools Hub", page_icon="🦡", layout="wide
 # Key: Name shown in sidebar, Value: The filename of your existing apps
 APPS = {
     "🦡 Asset Matrix Creator": "streamlit_app.py",
-    "📦 Ad and Creative matcher": "adMatcher.py",
+    "📦 Ad and Creative matcher": "AdMatcher.py",
     "📁 File Matcher": "FileMatcher.py" # Ensure this filename matches your 3rd app
 }
 
