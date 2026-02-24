@@ -20,11 +20,10 @@ with top_col1:
     st.title("📁 Dynamic File Matcher")
 
 with top_col2:
-    # Use a number input to let users expand or shrink columns
     num_cols = st.number_input("Number of Columns to Paste", min_value=1, max_value=20, value=4)
 
 with top_col3:
-    st.write(" ") # Padding
+    st.write(" ") 
     if st.button("🔄 Reset All", use_container_width=True, on_click=reset_app):
         st.rerun()
 
@@ -47,11 +46,7 @@ with col1:
 
 with col2:
     st.subheader(f"2. Paste Expected Names ({num_cols} Columns)")
-    
-    # Dynamically create the column list based on user input
     column_names = [f"Col {i+1}" for i in range(num_cols)]
-    
-    # Initialize the table with the dynamic number of columns
     init_df = pd.DataFrame([["" for _ in range(num_cols)]] * 10, columns=column_names)
     
     pasted_df = st.data_editor(
@@ -59,7 +54,7 @@ with col2:
         num_rows="dynamic", 
         use_container_width=True,
         hide_index=True,
-        key=f"editor_{st.session_state['data_editor_key']}_{num_cols}" # Key changes if col count changes
+        key=f"editor_{st.session_state['data_editor_key']}_{num_cols}"
     )
 
 st.divider()
@@ -71,14 +66,25 @@ has_pasted = not pasted_df.replace('', pd.NA).dropna(how='all').empty
 if not has_uploaded and not has_pasted:
     st.info("Waiting for file uploads and pasted data...")
 else:
-    # Flatten all dynamic columns into a single list
+    # Clean and flatten pasted names
     raw_pasted_names = pasted_df.values.flatten()
     expected_names = set([str(name).strip() for name in raw_pasted_names if str(name).strip()])
 
-    st.subheader("3. Match Analysis")
-    
+    # Calculate Matches
+    matched = expected_names intersection uploaded_names
     missing = expected_names - uploaded_names
     extra = uploaded_names - expected_names
+
+    st.subheader("3. Match Analysis")
+    
+    # --- NEW: Summary Metrics ---
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Expected", len(expected_names))
+    m2.metric("Successfully Matched", len(matched), delta=f"{len(matched)} files", delta_color="normal")
+    m3.metric("Missing Files", len(missing), delta=f"-{len(missing)}" if missing else "0", delta_color="inverse")
+    m4.metric("Extra Uploads", len(extra))
+    
+    st.write("---")
 
     if not missing and expected_names:
         st.success("✨ All pasted filenames were found in the uploaded batch!")
