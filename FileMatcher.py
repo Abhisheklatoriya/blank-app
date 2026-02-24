@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Dynamic File Matcher", layout="wide")
+# DO NOT use st.set_page_config here as it's already in Main_App.py
 
 # --- Reset Logic ---
 def reset_app():
@@ -66,22 +66,20 @@ has_pasted = not pasted_df.replace('', pd.NA).dropna(how='all').empty
 if not has_uploaded and not has_pasted:
     st.info("Waiting for file uploads and pasted data...")
 else:
-    # Clean and flatten pasted names
     raw_pasted_names = pasted_df.values.flatten()
     expected_names = set([str(name).strip() for name in raw_pasted_names if str(name).strip()])
 
-    # Calculate Matches
-    matched = expected_names intersection uploaded_names
+    # Fixed syntax here:
+    matched = expected_names.intersection(uploaded_names)
     missing = expected_names - uploaded_names
     extra = uploaded_names - expected_names
 
     st.subheader("3. Match Analysis")
     
-    # --- NEW: Summary Metrics ---
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Expected", len(expected_names))
-    m2.metric("Successfully Matched", len(matched), delta=f"{len(matched)} files", delta_color="normal")
-    m3.metric("Missing Files", len(missing), delta=f"-{len(missing)}" if missing else "0", delta_color="inverse")
+    m2.metric("Successfully Matched", len(matched))
+    m3.metric("Missing Files", len(missing))
     m4.metric("Extra Uploads", len(extra))
     
     st.write("---")
