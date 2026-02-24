@@ -71,7 +71,7 @@ else:
     expected_names = set([str(name).strip() for name in raw_pasted_names if str(name).strip()])
 
     # Calculate Matches
-    matched = expected_names intersection uploaded_names
+    matched = expected_names & uploaded_names
     missing = expected_names - uploaded_names
     extra = uploaded_names - expected_names
 
