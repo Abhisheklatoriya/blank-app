@@ -85,7 +85,7 @@ if uploaded_docx:
     # --- DISPLAY RESULTS ---
     for idx, ad in enumerate(filtered_ads):
         code = ad['code']
-        uid = f"{idx}_{code}"  # unique prefix for all keys in this row
+        uid = f"{idx}_{code}"
 
         with st.container(border=True):
             col_text, col_media = st.columns([1, 1])
@@ -121,7 +121,7 @@ if uploaded_docx:
                         else:
                             st.image(link)
 
-                        st.link_button(f"📥 Download {code}", link, key=f"admatcher_dl_{uid}")
+                        st.link_button(f"📥 Download {code}", link)
                     except Exception as e:
                         st.error(f"Error generating temporary Dropbox link: {e}")
                 else:
