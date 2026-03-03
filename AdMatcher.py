@@ -9,7 +9,6 @@ except ImportError:
     st.stop()
 
 # --- 1. SETUP & PAGE CONFIG SAFETY ---
-# This allows the app to run as a standalone OR inside the Hub
 try:
     st.set_page_config(page_title="Ad Matcher: Parent Brands", layout="wide")
 except st.errors.StreamlitAPIException:
@@ -19,7 +18,6 @@ st.title("🎯 Ad Matcher")
 
 # --- 2. DROPBOX AUTHENTICATION ---
 try:
-    # Ensure your secrets are set in the Streamlit Cloud Dashboard
     dbx = dropbox.Dropbox(st.secrets["dropbox"]["refresh_token"])
 except Exception as e:
     st.error("🔑 Dropbox Configuration Error. Check your Streamlit Secrets.")
@@ -84,7 +82,7 @@ if uploaded_docx:
     st.subheader(f"Found {len(filtered_ads)} ads for {brand_filter}")
 
     # --- 5. DISPLAY RESULTS ---
-    for ad in filtered_ads:
+    for i, ad in enumerate(filtered_ads):
         code = ad['code']
         with st.container(border=True):
             col_text, col_media = st.columns([1, 1])
@@ -95,11 +93,9 @@ if uploaded_docx:
                 st.info(ad['details'])
                 
                 copy_content = f"Ad Code: {code}\n{ad['details']}"
-                # Standard st.text_area for compatibility across all Streamlit versions
-                st.text_area("Copy Details (Ctrl+C):", value=copy_content, height=100, key=f"area_{code}")
+                st.text_area("Copy Details (Ctrl+C):", value=copy_content, height=100, key=f"area_{code}_{i}")
 
             with col_media:
-                # Find file in Dropbox list that matches the 8-digit code
                 match = next((f for f in all_files if isinstance(f, dropbox.files.FileMetadata) and code in f.name), None)
                 if match:
                     try:
