@@ -8,9 +8,6 @@ from pathlib import PurePosixPath
 st.title("Bulk Creative Renamer")
 st.caption("Upload a ZIP, add version history to creative names, and download a renamed ZIP.")
 
-# =========================================================
-# Helpers
-# =========================================================
 VERSION_SUFFIX_PATTERN = re.compile(r"^(.*?)(?:_(v\d+))?$", re.IGNORECASE)
 
 EXPECTED_COMPONENTS = [
@@ -24,15 +21,29 @@ EXPECTED_COMPONENTS = [
     "date_part",
 ]
 
+REQUIRED_COLUMNS = [
+    "original_path",
+    "folder",
+    "original_filename",
+    "year",
+    "client",
+    "lob",
+    "lang",
+    "campaign",
+    "message",
+    "size",
+    "date_part",
+    "version",
+    "ext",
+]
+
+
 def split_stem_and_ext(filename: str):
     p = PurePosixPath(filename)
     return p.stem, p.suffix
 
+
 def parse_filename(filename: str):
-    """
-    Example:
-    2026_RCI_RWI_EN_Q1 Samsung NPI Launch_Double Your Storage COV QC_320x50_Mar.10.2026_v2.jpg
-    """
     stem, ext = split_stem_and_ext(filename)
 
     m = VERSION_SUFFIX_PATTERN.match(stem)
@@ -65,6 +76,15 @@ def parse_filename(filename: str):
 
     return parsed
 
+
+def ensure_required_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for col in REQUIRED_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    return df
+
+
 def rebuild_filename(row: dict):
     parts = [
         str(row.get("year", "")).strip(),
@@ -86,6 +106,7 @@ def rebuild_filename(row: dict):
 
     ext = str(row.get("ext", "")).strip()
     return f"{stem}{ext}"
+
 
 def load_zip_to_records(zip_bytes: bytes):
     records = []
@@ -109,7 +130,9 @@ def load_zip_to_records(zip_bytes: bytes):
                 }
             )
 
-    return pd.DataFrame(records)
+    df = pd.DataFrame(records)
+    return ensure_required_columns(df)
+
 
 def apply_filters(df, folders, exts, langs, sizes, campaigns):
     filtered = df.copy()
@@ -127,16 +150,19 @@ def apply_filters(df, folders, exts, langs, sizes, campaigns):
 
     return filtered
 
+
 def build_new_path(row):
     new_filename = rebuild_filename(row)
     folder = str(row.get("folder", "")).strip()
     return f"{folder}/{new_filename}" if folder else new_filename
+
 
 def detect_duplicates(df):
     temp = df.copy()
     temp["new_path"] = temp.apply(lambda r: build_new_path(r.to_dict()), axis=1)
     dupes = temp[temp.duplicated("new_path", keep=False)].sort_values("new_path")
     return dupes
+
 
 def safe_unique_path(path_str: str, used_paths: set):
     if path_str not in used_paths:
@@ -156,6 +182,7 @@ def safe_unique_path(path_str: str, used_paths: set):
             used_paths.add(candidate)
             return candidate
         i += 1
+
 
 def build_output_zip(df: pd.DataFrame, original_zip_bytes: bytes):
     input_buffer = io.BytesIO(original_zip_bytes)
@@ -186,9 +213,14 @@ def build_output_zip(df: pd.DataFrame, original_zip_bytes: bytes):
     return output_buffer
 
 
-# =========================================================
+def safe_column_subset(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    existing = [c for c in columns if c in df.columns]
+    return df[existing]
+
+
+# -------------------------
 # Session state
-# =========================================================
+# -------------------------
 if "df_original" not in st.session_state:
     st.session_state.df_original = None
 
@@ -198,19 +230,32 @@ if "df_working" not in st.session_state:
 if "zip_bytes" not in st.session_state:
     st.session_state.zip_bytes = None
 
+if "uploaded_zip_name" not in st.session_state:
+    st.session_state.uploaded_zip_name = None
 
-# =========================================================
+
+# -------------------------
 # Upload
-# =========================================================
+# -------------------------
 uploaded_zip = st.file_uploader("Upload ZIP file", type=["zip"])
 
 if uploaded_zip is not None:
-    zip_bytes = uploaded_zip.read()
-    df_loaded = load_zip_to_records(zip_bytes)
+    # Reset state if a new file is uploaded
+    if st.session_state.uploaded_zip_name != uploaded_zip.name:
+        zip_bytes = uploaded_zip.read()
+        df_loaded = load_zip_to_records(zip_bytes)
 
-    st.session_state.zip_bytes = zip_bytes
-    st.session_state.df_original = df_loaded.copy()
-    st.session_state.df_working = df_loaded.copy()
+        st.session_state.zip_bytes = zip_bytes
+        st.session_state.df_original = df_loaded.copy()
+        st.session_state.df_working = df_loaded.copy()
+        st.session_state.uploaded_zip_name = uploaded_zip.name
+    elif st.session_state.df_working is None:
+        zip_bytes = uploaded_zip.read()
+        df_loaded = load_zip_to_records(zip_bytes)
+
+        st.session_state.zip_bytes = zip_bytes
+        st.session_state.df_original = df_loaded.copy()
+        st.session_state.df_working = df_loaded.copy()
 
 df = st.session_state.df_working
 
@@ -218,14 +263,17 @@ if df is None or df.empty:
     st.info("Upload a ZIP file to begin.")
     st.stop()
 
+df = ensure_required_columns(df)
+st.session_state.df_working = df
 
-# =========================================================
+
+# -------------------------
 # Sidebar filters
-# =========================================================
+# -------------------------
 st.sidebar.header("Filters")
 
 if st.sidebar.button("Reset all changes", use_container_width=True):
-    st.session_state.df_working = st.session_state.df_original.copy()
+    st.session_state.df_working = ensure_required_columns(st.session_state.df_original.copy())
     st.rerun()
 
 folder_options = sorted([f for f in df["folder"].dropna().unique().tolist() if f != ""])
@@ -249,44 +297,46 @@ filtered_df = apply_filters(
     selected_campaigns,
 )
 
+filtered_df = ensure_required_columns(filtered_df)
+
 st.sidebar.write(f"Total files: **{len(df)}**")
 st.sidebar.write(f"Matching files: **{len(filtered_df)}**")
 
 
-# =========================================================
+# -------------------------
 # Preview
-# =========================================================
+# -------------------------
 st.subheader("File preview")
 
 preview_df = filtered_df.copy()
 preview_df["new_filename_preview"] = preview_df.apply(lambda r: rebuild_filename(r.to_dict()), axis=1)
 
+preview_cols = [
+    "original_path",
+    "folder",
+    "year",
+    "client",
+    "lob",
+    "lang",
+    "campaign",
+    "message",
+    "size",
+    "date_part",
+    "version",
+    "ext",
+    "new_filename_preview",
+]
+
 st.dataframe(
-    preview_df[
-        [
-            "original_path",
-            "folder",
-            "year",
-            "client",
-            "lob",
-            "lang",
-            "campaign",
-            "message",
-            "size",
-            "date_part",
-            "version",
-            "ext",
-            "new_filename_preview",
-        ]
-    ],
+    safe_column_subset(preview_df, preview_cols),
     use_container_width=True,
     height=350,
 )
 
 
-# =========================================================
-# Version history tool
-# =========================================================
+# -------------------------
+# Version tool
+# -------------------------
 st.subheader("Add version history")
 
 apply_scope = st.radio(
@@ -302,10 +352,7 @@ else:
 
 st.write(f"Files to update: {int(target_mask.sum())}")
 
-version_value = st.selectbox(
-    "Choose version",
-    ["v2", "v3", "v4", "v5"]
-)
+version_value = st.selectbox("Choose version", ["v2", "v3", "v4", "v5"])
 
 c1, c2 = st.columns(2)
 
@@ -313,22 +360,20 @@ with c1:
     if st.button("Apply version", use_container_width=True):
         updated_df = df.copy()
         updated_df.loc[target_mask, "version"] = version_value
-        st.session_state.df_working = updated_df
-        st.success(f"Applied {version_value} to {int(target_mask.sum())} file(s).")
+        st.session_state.df_working = ensure_required_columns(updated_df)
         st.rerun()
 
 with c2:
     if st.button("Remove version history", use_container_width=True):
         updated_df = df.copy()
         updated_df.loc[target_mask, "version"] = ""
-        st.session_state.df_working = updated_df
-        st.success(f"Removed version history from {int(target_mask.sum())} file(s).")
+        st.session_state.df_working = ensure_required_columns(updated_df)
         st.rerun()
 
 
-# =========================================================
-# Manual edit
-# =========================================================
+# -------------------------
+# Manual editor
+# -------------------------
 st.subheader("Manual editor")
 
 editor_source = filtered_df.copy()
@@ -348,8 +393,10 @@ editable_cols = [
     "ext",
 ]
 
+editor_cols = ["original_path"] + editable_cols + ["new_filename_preview"]
+
 edited_df = st.data_editor(
-    editor_source[["original_path"] + editable_cols + ["new_filename_preview"]],
+    safe_column_subset(editor_source, editor_cols),
     use_container_width=True,
     num_rows="fixed",
     height=320,
@@ -364,31 +411,31 @@ if st.button("Save manual edits from filtered view", use_container_width=True):
         op = updated_df.at[idx, "original_path"]
         if op in edit_lookup:
             for col in editable_cols:
-                updated_df.at[idx, col] = edit_lookup[op][col]
+                if col in edit_lookup[op]:
+                    updated_df.at[idx, col] = edit_lookup[op][col]
 
-    st.session_state.df_working = updated_df
-    st.success("Manual edits saved.")
+    st.session_state.df_working = ensure_required_columns(updated_df)
     st.rerun()
 
 
-# =========================================================
+# -------------------------
 # Final preview
-# =========================================================
+# -------------------------
 st.subheader("Final output preview")
 
-final_df = st.session_state.df_working.copy()
+final_df = ensure_required_columns(st.session_state.df_working.copy())
 final_df["new_filename"] = final_df.apply(lambda r: rebuild_filename(r.to_dict()), axis=1)
 final_df["new_path"] = final_df.apply(lambda r: build_new_path(r.to_dict()), axis=1)
 
+final_cols = [
+    "original_path",
+    "new_path",
+    "version",
+    "ext",
+]
+
 st.dataframe(
-    final_df[
-        [
-            "original_path",
-            "new_path",
-            "version",
-            "ext",
-        ]
-    ],
+    safe_column_subset(final_df, final_cols),
     use_container_width=True,
     height=300,
 )
@@ -398,7 +445,7 @@ dupes = detect_duplicates(final_df)
 if not dupes.empty:
     st.warning("Duplicate output paths detected. The downloaded ZIP will auto-fix duplicates with _dup1, _dup2, etc.")
     st.dataframe(
-        dupes[["original_path", "new_path"]],
+        safe_column_subset(dupes, ["original_path", "new_path"]),
         use_container_width=True,
         height=220,
     )
@@ -406,9 +453,9 @@ else:
     st.success("No duplicate output paths detected.")
 
 
-# =========================================================
+# -------------------------
 # Download
-# =========================================================
+# -------------------------
 st.subheader("Download renamed ZIP")
 
 output_zip = build_output_zip(final_df, st.session_state.zip_bytes)
