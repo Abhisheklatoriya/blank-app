@@ -5,14 +5,14 @@ import io
 import re
 from pathlib import PurePosixPath
 
-st.set_page_config(page_title="Bulk Creative Renamer", layout="wide")
-
 st.title("Bulk Creative Renamer")
-st.caption("Upload a ZIP, bulk rename filename components, and download a renamed ZIP.")
+st.caption("Upload a ZIP, add version history to creative names, and download a renamed ZIP.")
 
 # =========================================================
 # Helpers
 # =========================================================
+VERSION_SUFFIX_PATTERN = re.compile(r"^(.*?)(?:_(v\d+))?$", re.IGNORECASE)
+
 EXPECTED_COMPONENTS = [
     "year",
     "client",
@@ -21,41 +21,34 @@ EXPECTED_COMPONENTS = [
     "campaign",
     "message",
     "size",
-    "date_version",
+    "date_part",
 ]
-
-DISPLAY_COMPONENTS = {
-    "year": "Year",
-    "client": "Client",
-    "lob": "LOB",
-    "lang": "Language",
-    "campaign": "Campaign",
-    "message": "Message",
-    "size": "Size",
-    "date_version": "Date / Version",
-}
-
-VERSION_PATTERN = re.compile(r"^(?P<base>.+?)(?:_(?P<version>v\d+))?$", re.IGNORECASE)
-
 
 def split_stem_and_ext(filename: str):
     p = PurePosixPath(filename)
     return p.stem, p.suffix
 
-
 def parse_filename(filename: str):
     """
-    Expected filename structure:
-    2026_RCI_RWI_EN_Q1 Samsung NPI Launch_Double Your Storage COV QC_320x50_Mar.10.2026.png
-
-    Parsed as:
-    year_client_lob_lang_campaign_message_size_dateversion.ext
+    Example:
+    2026_RCI_RWI_EN_Q1 Samsung NPI Launch_Double Your Storage COV QC_320x50_Mar.10.2026_v2.jpg
     """
     stem, ext = split_stem_and_ext(filename)
-    parts = stem.split("_")
+
+    m = VERSION_SUFFIX_PATTERN.match(stem)
+    if m:
+        base_stem = m.group(1) or ""
+        version = m.group(2) or ""
+    else:
+        base_stem = stem
+        version = ""
+
+    parts = base_stem.split("_")
 
     parsed = {k: "" for k in EXPECTED_COMPONENTS}
     parsed["ext"] = ext
+    parsed["version"] = version
+    parsed["base_stem"] = base_stem
 
     if len(parts) >= 8:
         parsed["year"] = parts[0]
@@ -65,29 +58,14 @@ def parse_filename(filename: str):
         parsed["campaign"] = parts[4]
         parsed["message"] = parts[5]
         parsed["size"] = parts[6]
-        parsed["date_version"] = "_".join(parts[7:])
+        parsed["date_part"] = "_".join(parts[7:])
     else:
         for i, key in enumerate(EXPECTED_COMPONENTS[:len(parts)]):
             parsed[key] = parts[i]
 
-    m = VERSION_PATTERN.match(parsed["date_version"])
-    if m:
-        parsed["date"] = m.group("base") or ""
-        parsed["version"] = m.group("version") or ""
-    else:
-        parsed["date"] = parsed["date_version"]
-        parsed["version"] = ""
-
     return parsed
 
-
 def rebuild_filename(row: dict):
-    date_version = str(row.get("date", "")).strip()
-    version = str(row.get("version", "")).strip()
-
-    if version:
-        date_version = f"{date_version}_{version}"
-
     parts = [
         str(row.get("year", "")).strip(),
         str(row.get("client", "")).strip(),
@@ -96,14 +74,18 @@ def rebuild_filename(row: dict):
         str(row.get("campaign", "")).strip(),
         str(row.get("message", "")).strip(),
         str(row.get("size", "")).strip(),
-        date_version,
+        str(row.get("date_part", "")).strip(),
     ]
 
     parts = [p for p in parts if p]
     stem = "_".join(parts)
+
+    version = str(row.get("version", "")).strip()
+    if version:
+        stem = f"{stem}_{version}"
+
     ext = str(row.get("ext", "")).strip()
     return f"{stem}{ext}"
-
 
 def load_zip_to_records(zip_bytes: bytes):
     records = []
@@ -120,7 +102,6 @@ def load_zip_to_records(zip_bytes: bytes):
 
             records.append(
                 {
-                    "selected": True,
                     "original_path": rel_path,
                     "folder": "" if folder == "." else folder,
                     "original_filename": filename,
@@ -129,7 +110,6 @@ def load_zip_to_records(zip_bytes: bytes):
             )
 
     return pd.DataFrame(records)
-
 
 def apply_filters(df, folders, exts, langs, sizes, campaigns):
     filtered = df.copy()
@@ -147,26 +127,16 @@ def apply_filters(df, folders, exts, langs, sizes, campaigns):
 
     return filtered
 
-
-def split_date_and_version(value: str):
-    m = VERSION_PATTERN.match(value.strip())
-    if m:
-        return m.group("base") or "", m.group("version") or ""
-    return value.strip(), ""
-
-
 def build_new_path(row):
     new_filename = rebuild_filename(row)
     folder = str(row.get("folder", "")).strip()
     return f"{folder}/{new_filename}" if folder else new_filename
-
 
 def detect_duplicates(df):
     temp = df.copy()
     temp["new_path"] = temp.apply(lambda r: build_new_path(r.to_dict()), axis=1)
     dupes = temp[temp.duplicated("new_path", keep=False)].sort_values("new_path")
     return dupes
-
 
 def safe_unique_path(path_str: str, used_paths: set):
     if path_str not in used_paths:
@@ -186,7 +156,6 @@ def safe_unique_path(path_str: str, used_paths: set):
             used_paths.add(candidate)
             return candidate
         i += 1
-
 
 def build_output_zip(df: pd.DataFrame, original_zip_bytes: bytes):
     input_buffer = io.BytesIO(original_zip_bytes)
@@ -215,34 +184,6 @@ def build_output_zip(df: pd.DataFrame, original_zip_bytes: bytes):
 
     output_buffer.seek(0)
     return output_buffer
-
-
-def apply_update_to_subset(df, mask, component_key, replace_value, find_value=""):
-    updated_df = df.copy()
-
-    if component_key == "date_version":
-        subset_idx = updated_df[mask].index
-
-        for idx in subset_idx:
-            current_combined = (
-                f"{updated_df.at[idx, 'date']}_{updated_df.at[idx, 'version']}"
-                if str(updated_df.at[idx, "version"]).strip()
-                else str(updated_df.at[idx, "date"]).strip()
-            )
-
-            if find_value.strip() and current_combined != find_value.strip():
-                continue
-
-            new_date, new_version = split_date_and_version(replace_value)
-            updated_df.at[idx, "date"] = new_date
-            updated_df.at[idx, "version"] = new_version
-
-    else:
-        if find_value.strip():
-            mask = mask & (updated_df[component_key].astype(str) == find_value.strip())
-        updated_df.loc[mask, component_key] = replace_value.strip()
-
-    return updated_df
 
 
 # =========================================================
@@ -277,10 +218,11 @@ if df is None or df.empty:
     st.info("Upload a ZIP file to begin.")
     st.stop()
 
+
 # =========================================================
-# Sidebar Controls
+# Sidebar filters
 # =========================================================
-st.sidebar.header("Controls")
+st.sidebar.header("Filters")
 
 if st.sidebar.button("Reset all changes", use_container_width=True):
     st.session_state.df_working = st.session_state.df_original.copy()
@@ -307,19 +249,17 @@ filtered_df = apply_filters(
     selected_campaigns,
 )
 
-st.sidebar.markdown("---")
 st.sidebar.write(f"Total files: **{len(df)}**")
 st.sidebar.write(f"Matching files: **{len(filtered_df)}**")
 
+
 # =========================================================
-# Main Preview
+# Preview
 # =========================================================
-st.success(f"Loaded {len(df)} files.")
-st.subheader("Filtered file preview")
+st.subheader("File preview")
 
 preview_df = filtered_df.copy()
 preview_df["new_filename_preview"] = preview_df.apply(lambda r: rebuild_filename(r.to_dict()), axis=1)
-preview_df["new_path_preview"] = preview_df.apply(lambda r: build_new_path(r.to_dict()), axis=1)
 
 st.dataframe(
     preview_df[
@@ -333,7 +273,7 @@ st.dataframe(
             "campaign",
             "message",
             "size",
-            "date",
+            "date_part",
             "version",
             "ext",
             "new_filename_preview",
@@ -343,122 +283,48 @@ st.dataframe(
     height=350,
 )
 
-# =========================================================
-# Bulk Edit
-# =========================================================
-st.subheader("Bulk edit matching files")
 
-c1, c2, c3 = st.columns(3)
+# =========================================================
+# Version history tool
+# =========================================================
+st.subheader("Add version history")
+
+apply_scope = st.radio(
+    "Apply version to:",
+    ["All files", "Filtered files"],
+    horizontal=True
+)
+
+if apply_scope == "All files":
+    target_mask = pd.Series(True, index=df.index)
+else:
+    target_mask = df["original_path"].isin(filtered_df["original_path"])
+
+st.write(f"Files to update: {int(target_mask.sum())}")
+
+version_value = st.selectbox(
+    "Choose version",
+    ["v2", "v3", "v4", "v5"]
+)
+
+c1, c2 = st.columns(2)
 
 with c1:
-    component_key = st.selectbox(
-        "Choose component",
-        options=list(DISPLAY_COMPONENTS.keys()),
-        format_func=lambda x: DISPLAY_COMPONENTS[x],
-    )
+    if st.button("Apply version", use_container_width=True):
+        updated_df = df.copy()
+        updated_df.loc[target_mask, "version"] = version_value
+        st.session_state.df_working = updated_df
+        st.success(f"Applied {version_value} to {int(target_mask.sum())} file(s).")
+        st.rerun()
 
 with c2:
-    find_value = st.text_input("Find exact value inside matching files (optional)")
-
-with c3:
-    replace_value = st.text_input("Replace with")
-
-if st.button("Apply bulk update to matching files", use_container_width=True):
-    if not replace_value.strip():
-        st.warning("Please enter a replacement value.")
-    else:
-        matching_paths = set(filtered_df["original_path"].tolist())
-        mask = df["original_path"].isin(matching_paths)
-
-        updated_df = apply_update_to_subset(
-            df=df,
-            mask=mask,
-            component_key=component_key,
-            replace_value=replace_value,
-            find_value=find_value,
-        )
-
-        st.session_state.df_working = updated_df
-        st.success("Bulk update applied.")
-        st.rerun()
-
-# =========================================================
-# Quick Date Update
-# =========================================================
-st.subheader("Quick date update for matching files")
-
-q1, q2 = st.columns(2)
-
-with q1:
-    old_date_value = st.text_input("Current date or date_version", placeholder="Mar.10.2026")
-
-with q2:
-    new_date_value = st.text_input("New date or date_version", placeholder="Mar.10.2026_v2")
-
-if st.button("Update date for matching files", use_container_width=True):
-    if not old_date_value.strip() or not new_date_value.strip():
-        st.warning("Please enter both the current and new date values.")
-    else:
+    if st.button("Remove version history", use_container_width=True):
         updated_df = df.copy()
-        matching_paths = set(filtered_df["original_path"].tolist())
-        mask = updated_df["original_path"].isin(matching_paths)
-
-        new_date, new_version = split_date_and_version(new_date_value)
-
-        changed = 0
-        for idx in updated_df[mask].index:
-            current_combined = (
-                f"{updated_df.at[idx, 'date']}_{updated_df.at[idx, 'version']}"
-                if str(updated_df.at[idx, "version"]).strip()
-                else str(updated_df.at[idx, "date"]).strip()
-            )
-
-            if current_combined == old_date_value.strip() or str(updated_df.at[idx, "date"]).strip() == old_date_value.strip():
-                updated_df.at[idx, "date"] = new_date
-                updated_df.at[idx, "version"] = new_version
-                changed += 1
-
+        updated_df.loc[target_mask, "version"] = ""
         st.session_state.df_working = updated_df
-        st.success(f"Updated {changed} matching file(s).")
+        st.success(f"Removed version history from {int(target_mask.sum())} file(s).")
         st.rerun()
 
-# =========================================================
-# Quick Version Controls
-# =========================================================
-st.subheader("Quick version marker for matching files")
-
-v1, v2, v3, v4 = st.columns(4)
-
-matching_paths = set(filtered_df["original_path"].tolist())
-subset_mask = df["original_path"].isin(matching_paths)
-
-if v1.button("Set v2", use_container_width=True):
-    updated_df = df.copy()
-    updated_df.loc[subset_mask, "version"] = "v2"
-    st.session_state.df_working = updated_df
-    st.success("Applied v2 to matching files.")
-    st.rerun()
-
-if v2.button("Set v3", use_container_width=True):
-    updated_df = df.copy()
-    updated_df.loc[subset_mask, "version"] = "v3"
-    st.session_state.df_working = updated_df
-    st.success("Applied v3 to matching files.")
-    st.rerun()
-
-if v3.button("Set v4", use_container_width=True):
-    updated_df = df.copy()
-    updated_df.loc[subset_mask, "version"] = "v4"
-    st.session_state.df_working = updated_df
-    st.success("Applied v4 to matching files.")
-    st.rerun()
-
-if v4.button("Remove version", use_container_width=True):
-    updated_df = df.copy()
-    updated_df.loc[subset_mask, "version"] = ""
-    st.session_state.df_working = updated_df
-    st.success("Removed version from matching files.")
-    st.rerun()
 
 # =========================================================
 # Manual edit
@@ -477,7 +343,7 @@ editable_cols = [
     "campaign",
     "message",
     "size",
-    "date",
+    "date_part",
     "version",
     "ext",
 ]
@@ -504,8 +370,9 @@ if st.button("Save manual edits from filtered view", use_container_width=True):
     st.success("Manual edits saved.")
     st.rerun()
 
+
 # =========================================================
-# Final preview + duplicate warnings
+# Final preview
 # =========================================================
 st.subheader("Final output preview")
 
@@ -518,26 +385,18 @@ st.dataframe(
         [
             "original_path",
             "new_path",
-            "year",
-            "client",
-            "lob",
-            "lang",
-            "campaign",
-            "message",
-            "size",
-            "date",
             "version",
             "ext",
         ]
     ],
     use_container_width=True,
-    height=360,
+    height=300,
 )
 
 dupes = detect_duplicates(final_df)
 
 if not dupes.empty:
-    st.warning("Duplicate output paths detected. The downloaded ZIP will auto-fix duplicates by appending _dup1, _dup2, etc.")
+    st.warning("Duplicate output paths detected. The downloaded ZIP will auto-fix duplicates with _dup1, _dup2, etc.")
     st.dataframe(
         dupes[["original_path", "new_path"]],
         use_container_width=True,
@@ -545,6 +404,7 @@ if not dupes.empty:
     )
 else:
     st.success("No duplicate output paths detected.")
+
 
 # =========================================================
 # Download
