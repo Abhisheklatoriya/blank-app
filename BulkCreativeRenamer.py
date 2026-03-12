@@ -59,7 +59,6 @@ def parse_filename(filename: str):
     parsed = {k: "" for k in EXPECTED_COMPONENTS}
     parsed["ext"] = ext
     parsed["version"] = version
-    parsed["base_stem"] = base_stem
 
     if len(parts) >= 8:
         parsed["year"] = parts[0]
@@ -218,9 +217,6 @@ def safe_column_subset(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     return df[existing]
 
 
-# -------------------------
-# Session state
-# -------------------------
 if "df_original" not in st.session_state:
     st.session_state.df_original = None
 
@@ -234,13 +230,9 @@ if "uploaded_zip_name" not in st.session_state:
     st.session_state.uploaded_zip_name = None
 
 
-# -------------------------
-# Upload
-# -------------------------
 uploaded_zip = st.file_uploader("Upload ZIP file", type=["zip"])
 
 if uploaded_zip is not None:
-    # Reset state if a new file is uploaded
     if st.session_state.uploaded_zip_name != uploaded_zip.name:
         zip_bytes = uploaded_zip.read()
         df_loaded = load_zip_to_records(zip_bytes)
@@ -266,10 +258,6 @@ if df is None or df.empty:
 df = ensure_required_columns(df)
 st.session_state.df_working = df
 
-
-# -------------------------
-# Sidebar filters
-# -------------------------
 st.sidebar.header("Filters")
 
 if st.sidebar.button("Reset all changes", use_container_width=True):
@@ -302,10 +290,6 @@ filtered_df = ensure_required_columns(filtered_df)
 st.sidebar.write(f"Total files: **{len(df)}**")
 st.sidebar.write(f"Matching files: **{len(filtered_df)}**")
 
-
-# -------------------------
-# Preview
-# -------------------------
 st.subheader("File preview")
 
 preview_df = filtered_df.copy()
@@ -333,10 +317,6 @@ st.dataframe(
     height=350,
 )
 
-
-# -------------------------
-# Version tool
-# -------------------------
 st.subheader("Add version history")
 
 apply_scope = st.radio(
@@ -370,57 +350,6 @@ with c2:
         st.session_state.df_working = ensure_required_columns(updated_df)
         st.rerun()
 
-
-# -------------------------
-# Manual editor
-# -------------------------
-st.subheader("Manual editor")
-
-editor_source = filtered_df.copy()
-editor_source["new_filename_preview"] = editor_source.apply(lambda r: rebuild_filename(r.to_dict()), axis=1)
-
-editable_cols = [
-    "folder",
-    "year",
-    "client",
-    "lob",
-    "lang",
-    "campaign",
-    "message",
-    "size",
-    "date_part",
-    "version",
-    "ext",
-]
-
-editor_cols = ["original_path"] + editable_cols + ["new_filename_preview"]
-
-edited_df = st.data_editor(
-    safe_column_subset(editor_source, editor_cols),
-    use_container_width=True,
-    num_rows="fixed",
-    height=320,
-    key="manual_editor",
-)
-
-if st.button("Save manual edits from filtered view", use_container_width=True):
-    updated_df = df.copy()
-    edit_lookup = edited_df.set_index("original_path").to_dict("index")
-
-    for idx in updated_df.index:
-        op = updated_df.at[idx, "original_path"]
-        if op in edit_lookup:
-            for col in editable_cols:
-                if col in edit_lookup[op]:
-                    updated_df.at[idx, col] = edit_lookup[op][col]
-
-    st.session_state.df_working = ensure_required_columns(updated_df)
-    st.rerun()
-
-
-# -------------------------
-# Final preview
-# -------------------------
 st.subheader("Final output preview")
 
 final_df = ensure_required_columns(st.session_state.df_working.copy())
@@ -452,10 +381,6 @@ if not dupes.empty:
 else:
     st.success("No duplicate output paths detected.")
 
-
-# -------------------------
-# Download
-# -------------------------
 st.subheader("Download renamed ZIP")
 
 output_zip = build_output_zip(final_df, st.session_state.zip_bytes)
