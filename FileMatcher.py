@@ -31,36 +31,67 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".webm", ".m4v"}
 ZIP_EXTS = {".zip"}
 
+PREVIEW_IMAGE_WIDTH = 320
+PREVIEW_VIDEO_WIDTH_PX = 320
+
 def get_extension(filename: str) -> str:
     return os.path.splitext(filename.lower())[1]
 
 def safe_file_list(uploaded_files):
     return uploaded_files if uploaded_files else []
 
+def render_small_video(file_bytes: bytes, unique_key: str):
+    video_html = f"""
+    <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
+        <video width="{PREVIEW_VIDEO_WIDTH_PX}" controls>
+            <source src="data:video/mp4;base64,{file_bytes.hex()}">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    """
+    # fallback to native st.video if needed
+    try:
+        import base64
+        video_b64 = base64.b64encode(file_bytes).decode()
+        video_html = f"""
+        <div style="display:flex; justify-content:center; margin-top:10px; margin-bottom:10px;">
+            <video width="{PREVIEW_VIDEO_WIDTH_PX}" controls>
+                <source src="data:video/mp4;base64,{video_b64}">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        """
+        st.components.v1.html(video_html, height=260)
+    except Exception:
+        st.video(file_bytes)
+
 def preview_regular_file(file_name: str, file_bytes: bytes):
     ext = get_extension(file_name)
 
     st.markdown(f"**Previewing:** `{file_name}`")
 
-    if ext in IMAGE_EXTS:
-        st.image(file_bytes, use_container_width=True)
+    left, center, right = st.columns([2, 3, 2])
 
-    elif ext in VIDEO_EXTS:
-        st.video(file_bytes)
+    with center:
+        if ext in IMAGE_EXTS:
+            st.image(file_bytes, width=PREVIEW_IMAGE_WIDTH)
 
-    elif ext in ZIP_EXTS:
-        preview_zip_file(file_name, file_bytes)
+        elif ext in VIDEO_EXTS:
+            render_small_video(file_bytes, unique_key=f"video_{file_name}")
 
-    else:
-        st.info("Preview is not supported for this file type.")
-        st.write(f"Detected extension: `{ext or 'unknown'}`")
-        st.download_button(
-            "Download file",
-            data=file_bytes,
-            file_name=file_name,
-            mime="application/octet-stream",
-            key=f"download_{file_name}"
-        )
+        elif ext in ZIP_EXTS:
+            preview_zip_file(file_name, file_bytes)
+
+        else:
+            st.info("Preview is not supported for this file type.")
+            st.write(f"Detected extension: `{ext or 'unknown'}`")
+            st.download_button(
+                "Download file",
+                data=file_bytes,
+                file_name=file_name,
+                mime="application/octet-stream",
+                key=f"download_{file_name}"
+            )
 
 def preview_zip_file(file_name: str, file_bytes: bytes):
     st.markdown(f"**ZIP archive:** `{file_name}`")
@@ -84,7 +115,6 @@ def preview_zip_file(file_name: str, file_bytes: bytes):
             if previewable:
                 st.success(f"{len(previewable)} previewable file(s) found inside the zip.")
 
-                # Keep index in range
                 if st.session_state["zip_inner_index"] >= len(previewable):
                     st.session_state["zip_inner_index"] = 0
 
@@ -118,10 +148,13 @@ def preview_zip_file(file_name: str, file_bytes: bytes):
 
                 st.markdown(f"**Inner preview:** `{inner_name}`")
 
-                if inner_ext in IMAGE_EXTS:
-                    st.image(inner_bytes, use_container_width=True)
-                elif inner_ext in VIDEO_EXTS:
-                    st.video(inner_bytes)
+                left, center, right = st.columns([2, 3, 2])
+
+                with center:
+                    if inner_ext in IMAGE_EXTS:
+                        st.image(inner_bytes, width=PREVIEW_IMAGE_WIDTH)
+                    elif inner_ext in VIDEO_EXTS:
+                        render_small_video(inner_bytes, unique_key=f"zip_video_{file_name}_{inner_name}")
 
             else:
                 st.info("No directly previewable image/video files found inside this zip.")
@@ -239,7 +272,6 @@ st.divider()
 st.subheader("4. File Previewer")
 
 if uploaded_files:
-    # Keep preview index valid
     if st.session_state["preview_index"] >= len(uploaded_files):
         st.session_state["preview_index"] = 0
 
@@ -269,9 +301,7 @@ if uploaded_files:
     current_file = uploaded_files[st.session_state["preview_index"]]
     current_bytes = current_file.getvalue()
 
-    st.caption(
-        f"File {st.session_state['preview_index'] + 1} of {len(uploaded_files)}"
-    )
+    st.caption(f"File {st.session_state['preview_index'] + 1} of {len(uploaded_files)}")
 
     info1, info2, info3 = st.columns(3)
     info1.metric("Filename", current_file.name)
