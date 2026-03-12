@@ -2,7 +2,7 @@ import streamlit as st
 import os
 
 # --- 1. Global Page Config ---
-st.set_page_config(page_title="Badger Tools", page_icon="🦡", layout="wide")
+st.set_page_config(page_title="Badger Workflows", page_icon="🦡", layout="wide")
 
 # Custom CSS for a clean, professional look and "App Cards"
 st.markdown("""
